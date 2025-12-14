@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Spotify Playlist Downloader</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🎵 Spotify Playlist Downloader</h1>
+            <p>Download your favorite Spotify playlists locally</p>
+        </header>
+
+        <div class="input-section">
+            <div class="input-group">
+                <input 
+                    type="text" 
+                    id="playlistUrl" 
+                    placeholder="Paste Spotify playlist URL here..."
+                    autocomplete="off"
+                >
+                <button id="fetchBtn" onclick="fetchPlaylist()">Fetch Playlist</button>
+            </div>
+            <p class="hint">Example: https://open.spotify.com/playlist/37i9dQZF1DXcBWIGoYBM5M</p>
+        </div>
+
+        <div id="playlistInfo" class="playlist-info" style="display: none;">
+            <div class="playlist-header">
+                <img id="playlistImage" src="" alt="Playlist cover">
+                <div class="playlist-details">
+                    <h2 id="playlistName"></h2>
+                    <p id="playlistDescription"></p>
+                    <p class="track-count" id="trackCount"></p>
+                </div>
+            </div>
+
+            <div class="action-buttons">
+                <button id="downloadBtn" onclick="downloadPlaylist()" class="download-btn">
+                    📥 Download All
+                </button>
+            </div>
+
+            <div id="trackList" class="track-list"></div>
+        </div>
+
+        <div id="progressSection" class="progress-section" style="display: none;">
+            <h3>Download Progress</h3>
+            
+            <div class="progress-bar-container">
+                <div id="progressBar" class="progress-bar"></div>
+            </div>
+            
+            <p id="progressText" class="progress-text"></p>
+            <p id="currentTrack" class="current-track"></p>
+
+            <div class="results">
+                <div class="completed">
+                    <h4>✅ Completed (<span id="completedCount">0</span>)</h4>
+                    <ul id="completedList"></ul>
+                </div>
+                
+                <div class="failed">
+                    <h4>❌ Failed (<span id="failedCount">0</span>)</h4>
+                    <ul id="failedList"></ul>
+                </div>
+            </div>
+        </div>
+
+        <div id="errorMessage" class="error-message" style="display: none;"></div>
+
+        <footer>
+            <p>⚠️ For personal use only. Respect copyright laws.</p>
+        </footer>
+    </div>
+
+    <script src="{{ url_for('static', filename='script.js') }}"></script>
+</body>
+</html>
