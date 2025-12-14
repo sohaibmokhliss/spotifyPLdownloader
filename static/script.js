@@ -78,43 +78,62 @@ function displayPlaylistInfo(playlist) {
     infoDiv.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 }
 
-async function downloadPlaylist() {
+async function downloadPlaylist(resume = false) {
     const playlistUrl = document.getElementById('playlistUrl').value.trim();
-    
+
     const downloadBtn = document.getElementById('downloadBtn');
+    const stopBtn = document.getElementById('stopBtn');
+    const resumeBtn = document.getElementById('resumeBtn');
+
     downloadBtn.disabled = true;
     downloadBtn.textContent = 'Downloading...';
-    
+    stopBtn.style.display = 'inline-block';
+    resumeBtn.style.display = 'none';
+
     const progressSection = document.getElementById('progressSection');
     progressSection.style.display = 'block';
-    
-    document.getElementById('progressBar').style.width = '0%';
-    document.getElementById('completedList').innerHTML = '';
-    document.getElementById('failedList').innerHTML = '';
-    document.getElementById('completedCount').textContent = '0';
-    document.getElementById('failedCount').textContent = '0';
-    
+
+    if (!resume) {
+        document.getElementById('progressBar').style.width = '0%';
+        document.getElementById('completedList').innerHTML = '';
+        document.getElementById('failedList').innerHTML = '';
+        document.getElementById('completedCount').textContent = '0';
+        document.getElementById('failedCount').textContent = '0';
+    }
+
     startProgressPolling();
-    
+
     try {
         const response = await fetch('/api/download', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
             },
-            body: JSON.stringify({ playlist_url: playlistUrl })
+            body: JSON.stringify({
+                playlist_url: playlistUrl,
+                resume: resume
+            })
         });
-        
+
         const data = await response.json();
-        
+
         if (!response.ok) {
             throw new Error(data.error || 'Download failed');
         }
-        
+
         updateProgress();
-        
-        alert(`Download complete! ${data.completed} tracks downloaded successfully.`);
-        
+
+        if (data.paused) {
+            stopBtn.style.display = 'none';
+            resumeBtn.style.display = 'inline-block';
+            downloadBtn.disabled = false;
+            downloadBtn.textContent = '📥 Download All';
+        } else {
+            alert(`Download complete! ${data.completed} tracks downloaded successfully.`);
+            stopBtn.style.display = 'none';
+            resumeBtn.style.display = 'none';
+        }
+
     } catch (error) {
         showError(error.message);
     } finally {
@@ -122,6 +141,27 @@ async function downloadPlaylist() {
         downloadBtn.disabled = false;
         downloadBtn.textContent = '📥 Download All';
     }
+}
+
+async function stopDownload() {
+    try {
+        const response = await fetch('/api/stop', {
+            method: 'POST'
+        });
+
+        const data = await response.json();
+
+        if (response.ok) {
+            document.getElementById('stopBtn').style.display = 'none';
+            document.getElementById('resumeBtn').style.display = 'inline-block';
+        }
+    } catch (error) {
+        showError('Failed to stop download');
+    }
+}
+
+async function resumeDownload() {
+    downloadPlaylist(true);
 }
 
 function startProgressPolling() {

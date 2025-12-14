@@ -1,6 +1,6 @@
 # 🎵 Spotify Playlist Downloader
 
-A simple web application to download songs from your Spotify playlists locally. The app fetches playlist data from Spotify, searches for matching YouTube videos, and downloads them as MP3 files using RapidAPI.
+A powerful web application to download songs from your Spotify playlists locally. The app fetches playlist data from Spotify, searches for matching YouTube videos, and downloads them as MP3 files using yt-dlp.
 
 ## ⚠️ Legal Disclaimer
 
@@ -10,20 +10,24 @@ A simple web application to download songs from your Spotify playlists locally. 
 
 - 🎼 Fetch any public Spotify playlist
 - 🔍 Automatic YouTube search for each track
-- 📥 Download as MP3 files
+- 📥 Download as high-quality MP3 files (192kbps)
+- 📁 **Auto-organize: Each playlist gets its own folder**
+- ⏸️ **Stop/Resume: Pause and resume downloads anytime**
 - 📊 Real-time progress tracking
-- 🎨 Clean, simple web interface
+- 🎨 Clean, responsive web interface
 - 💾 Runs completely locally
+- 🌐 **Access from any device on your network**
 - 📝 Track list preview before downloading
 - ✅ Success/failure tracking for each download
+- 🆓 **No API keys needed - completely free!**
 
 ## 🚀 Quick Start
 
 ### Prerequisites
 
 - Python 3.8 or higher
-- Spotify Developer account
-- RapidAPI account
+- FFmpeg (for audio conversion)
+- Spotify Developer account (free)
 
 ### 1. Clone the Repository
 
@@ -32,64 +36,117 @@ git clone https://github.com/sohaibmokhliss/spotifyPLdownloader.git
 cd spotifyPLdownloader
 ```
 
-### 2. Install Dependencies
+### 2. Install System Dependencies
+
+**On Arch Linux:**
+```bash
+sudo pacman -S ffmpeg python-pip
+```
+
+**On Ubuntu/Debian:**
+```bash
+sudo apt update
+sudo apt install ffmpeg python3-pip
+```
+
+**On macOS:**
+```bash
+brew install ffmpeg
+```
+
+**On Windows:**
+Download FFmpeg from [ffmpeg.org](https://ffmpeg.org/download.html) and add to PATH.
+
+### 3. Set Up Virtual Environment (Recommended)
+
+```bash
+python3 -m venv venv
+source venv/bin/activate  # On Windows: venv\Scripts\activate
+```
+
+### 4. Install Python Dependencies
 
 ```bash
 pip install -r requirements.txt
 ```
 
-### 3. Get API Credentials
+### 5. Get Spotify API Credentials
 
-#### Spotify API:
 1. Go to [Spotify Developer Dashboard](https://developer.spotify.com/dashboard)
 2. Click "Create App"
 3. Fill in app name and description
 4. Copy your **Client ID** and **Client Secret**
 
-#### RapidAPI (YouTube-to-MP3):
-1. Go to [RapidAPI YouTube-to-MP3](https://rapidapi.com/marcoCollatina/api/youtube-to-mp315)
-2. Subscribe to the API (free tier available)
-3. Copy your **API Key**
-
-### 4. Configure Environment
+### 6. Configure Environment
 
 ```bash
 cp .env.example .env
 ```
 
-Edit `.env` and add your credentials:
+Edit `.env` and add your Spotify credentials:
 
 ```env
 SPOTIFY_CLIENT_ID=your_actual_client_id
 SPOTIFY_CLIENT_SECRET=your_actual_client_secret
-RAPIDAPI_KEY=your_rapidapi_key
+DOWNLOAD_FOLDER=downloads
+FLASK_PORT=5000
 ```
 
-### 5. Run the Application
+### 7. Run the Application
 
 ```bash
 python app.py
+# Or with virtual environment:
+./venv/bin/python app.py
 ```
 
-Open your browser and go to: **http://localhost:5000**
+The app will be accessible at:
+- **Local machine**: http://localhost:5000
+- **Other devices on network**: http://YOUR_LOCAL_IP:5000
 
 ## 📖 How to Use
 
-1. **Get Spotify Playlist URL:**
-   - Open Spotify
-   - Go to any playlist
-   - Click Share → Copy link to playlist
-   - Example: `https://open.spotify.com/playlist/37i9dQZF1DXcBWIGoYBM5M`
+### 1. Get Spotify Playlist URL
 
-2. **Paste URL in the app:**
-   - Paste the playlist URL
-   - Click "Fetch Playlist"
-   - Review the tracks
+- Open Spotify (desktop or mobile)
+- Go to any playlist
+- Click Share → Copy link to playlist
+- Example: `https://open.spotify.com/playlist/37i9dQZF1DXcBWIGoYBM5M`
 
-3. **Download:**
-   - Click "Download All"
-   - Watch progress in real-time
-   - Find downloaded files in the `downloads/` folder
+### 2. Fetch Playlist
+
+- Open the app in your browser
+- Paste the playlist URL
+- Click "Fetch Playlist"
+- Review the tracks
+
+### 3. Download
+
+- Click "📥 Download All" to start
+- **Use "⏸️ Stop Download"** to pause after the current track
+- **Use "▶️ Resume Download"** to continue from where you left off
+- Watch real-time progress
+- Find downloaded files in `downloads/PLAYLIST_NAME/` folder
+
+### 4. Access from Other Devices
+
+The app is accessible from any device on your network:
+
+1. Find your computer's local IP:
+   ```bash
+   # Linux/Mac
+   ip addr show | grep "inet " | grep -v "127.0.0.1"
+
+   # Windows
+   ipconfig
+   ```
+
+2. On your phone/tablet, open browser and go to:
+   ```
+   http://YOUR_LOCAL_IP:5000
+   ```
+
+3. Use the app just like on your computer!
 
 ## 📁 Project Structure
 
@@ -101,21 +158,27 @@ spotifyPLdownloader/
 ├── .env                  # Your credentials (git-ignored)
 ├── .gitignore           # Git ignore rules
 ├── README.md            # This file
+├── venv/                # Virtual environment (created after setup)
 ├── templates/
 │   └── index.html       # Web interface
 ├── static/
 │   ├── style.css        # Styling
 │   └── script.js        # Frontend logic
 └── downloads/           # Downloaded MP3s (git-ignored)
+    ├── Playlist 1/      # Each playlist gets its own folder
+    ├── Playlist 2/
+    └── ...
 ```
 
 ## 🛠️ How It Works
 
 1. **Spotify Integration**: Fetches playlist metadata using Spotify Web API
 2. **YouTube Search**: Searches for matching videos using youtube-search-python
-3. **MP3 Conversion**: Downloads and converts videos using RapidAPI YouTube-to-MP3 service
-4. **Progress Tracking**: Real-time updates via polling endpoint
-5. **File Management**: Saves MP3 files with sanitized filenames
+3. **MP3 Download**: Downloads and converts to MP3 using yt-dlp (no API keys required!)
+4. **Smart Organization**: Creates separate folders for each playlist automatically
+5. **Progress Tracking**: Real-time updates via polling endpoint
+6. **Resume Support**: Tracks completed downloads to skip them when resuming
+7. **File Management**: Saves MP3 files with sanitized filenames
 
 ## 🔧 Troubleshooting
 
@@ -126,28 +189,66 @@ spotifyPLdownloader/
 
 ### "YouTube video not found"
 - Some tracks might not be available on YouTube
-- Try searching manually to verify
-- The app will skip unavailable tracks
+- The app will skip unavailable tracks automatically
+- Check the "Failed" list to see which tracks couldn't be downloaded
 
 ### "Download failed"
-- Check your RapidAPI subscription is active
-- Verify API key is correct
-- Check rate limits on your RapidAPI plan
+- Make sure FFmpeg is installed: `ffmpeg -version`
+- Check your internet connection
+- Some videos may be age-restricted or region-locked
 
 ### Downloads are slow
-- This is normal - each track needs to be searched and downloaded
-- The app adds small delays to respect rate limits
-- Expect 5-10 seconds per track
+- This is normal - each track is searched and downloaded individually
+- Downloading and converting high-quality audio takes time
+- The app adds 1-second delays to avoid rate limiting
+- Expect 5-15 seconds per track depending on your connection
+
+### Can't access from other devices
+- Make sure both devices are on the same WiFi/network
+- Check if your firewall is blocking port 5000
+- Verify you're using the correct local IP address
+
+### "ModuleNotFoundError" when running
+- Make sure you're using the virtual environment:
+  ```bash
+  source venv/bin/activate  # or ./venv/bin/python app.py
+  ```
+- Reinstall dependencies: `pip install -r requirements.txt`
 
 ## ⚙️ Configuration
 
 Edit `.env` to customize:
 
 ```env
-DOWNLOAD_FOLDER=my_music     # Change download location
-FLASK_PORT=8080              # Change port number
-FLASK_ENV=production         # Production mode
+# Spotify API Credentials
+SPOTIFY_CLIENT_ID=your_client_id_here
+SPOTIFY_CLIENT_SECRET=your_client_secret_here
+
+# App Configuration
+DOWNLOAD_FOLDER=downloads    # Change download location
+FLASK_PORT=5000              # Change port number
+FLASK_ENV=development        # Set to 'production' for deployment
 ```
+
+## 🎯 Features Explained
+
+### Playlist-Specific Folders
+Each playlist is downloaded into its own folder named after the playlist:
+```
+downloads/
+├── Chill Vibes/
+│   ├── Artist - Song 1.mp3
+│   └── Artist - Song 2.mp3
+├── Workout Mix/
+│   ├── Artist - Song 3.mp3
+│   └── Artist - Song 4.mp3
+```
+
+### Stop/Resume Functionality
+- **Stop**: Safely pause downloads after the current track finishes
+- **Resume**: Continue from exactly where you left off
+- Already downloaded tracks are automatically skipped
+- Perfect for large playlists or unstable connections
 
 ## 🤝 Contributing
 
@@ -167,8 +268,29 @@ This project is for educational purposes only. Use responsibly and respect copyr
 
 - [Spotify Web API](https://developer.spotify.com/documentation/web-api/)
 - [YouTube Search Python](https://github.com/alexmercerind/youtube-search-python)
-- [RapidAPI YouTube-to-MP3](https://rapidapi.com/marcoCollatina/api/youtube-to-mp315)
+- [yt-dlp](https://github.com/yt-dlp/yt-dlp) - The best YouTube downloader
 - [Flask](https://flask.palletsprojects.com/)
+- [FFmpeg](https://ffmpeg.org/) - Audio/video processing
+
+## 🎓 FAQ
+
+**Q: Do I need to pay for any API services?**
+A: No! The app uses yt-dlp which is completely free. You only need free Spotify API credentials.
+
+**Q: Can I download private playlists?**
+A: No, only public playlists are supported.
+
+**Q: What quality are the downloads?**
+A: MP3 files at 192kbps, which provides excellent quality for most use cases.
+
+**Q: Can multiple people use the app at once?**
+A: The app handles one download session at a time. Multiple users can access it, but downloads will queue.
+
+**Q: Where are my downloaded files?**
+A: In the `downloads/` folder, organized by playlist name.
+
+**Q: Can I run this on a server?**
+A: Yes! Set `FLASK_ENV=production` and consider using a production WSGI server like Gunicorn.
 
 ---
 
