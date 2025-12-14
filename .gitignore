@@ -4,6 +4,9 @@
 # Downloads folder
 downloads/
 
+# Spotify cache
+.cache
+
 # Python
 __pycache__/
 *.py[cod]

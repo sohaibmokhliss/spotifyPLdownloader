@@ -80,6 +80,28 @@ button:disabled {
     cursor: not-allowed;
 }
 
+.stop-btn {
+    background: #e74c3c;
+}
+
+.stop-btn:hover {
+    background: #c0392b;
+}
+
+.resume-btn {
+    background: #27ae60;
+}
+
+.resume-btn:hover {
+    background: #229954;
+}
+
+.action-buttons {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
 .hint {
     margin-top: 10px;
     color: #888;
