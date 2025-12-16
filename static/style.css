@@ -402,3 +402,257 @@ footer {
     font-size: 0.85em;
     opacity: 0.9;
 }
+
+.download-location-toggle {
+    margin-bottom: 20px;
+    text-align: center;
+}
+
+.download-location-toggle label {
+    display: block;
+    margin-bottom: 10px;
+    color: #333;
+    font-weight: 600;
+    font-size: 1.1em;
+}
+
+.toggle-buttons {
+    display: flex;
+    gap: 10px;
+    justify-content: center;
+}
+
+.toggle-btn {
+    padding: 12px 24px;
+    background: #f0f0f0;
+    color: #666;
+    border: 2px solid #ddd;
+    border-radius: 8px;
+    font-size: 15px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s;
+}
+
+.toggle-btn:hover {
+    background: #e0e0e0;
+}
+
+.toggle-btn.active {
+    background: #667eea;
+    color: white;
+    border-color: #667eea;
+}
+
+.download-link {
+    display: inline-block;
+    margin-left: 10px;
+    padding: 4px 12px;
+    background: #667eea;
+    color: white;
+    text-decoration: none;
+    border-radius: 5px;
+    font-size: 0.85em;
+    transition: background 0.3s;
+}
+
+.download-link:hover {
+    background: #5568d3;
+}
+
+/* Mobile Responsive Styles */
+@media screen and (max-width: 768px) {
+    body {
+        padding: 10px;
+    }
+
+    .container {
+        padding: 20px;
+        border-radius: 15px;
+    }
+
+    header h1 {
+        font-size: 1.8em;
+    }
+
+    header p {
+        font-size: 1em;
+    }
+
+    /* Make toggle buttons stack on very small screens */
+    .download-location-toggle label {
+        font-size: 1em;
+    }
+
+    .toggle-buttons {
+        flex-direction: row;
+        gap: 8px;
+    }
+
+    .toggle-btn {
+        padding: 10px 16px;
+        font-size: 14px;
+        flex: 1;
+    }
+
+    /* Input groups should stack on mobile */
+    .input-group {
+        flex-direction: column;
+        gap: 10px;
+    }
+
+    input[type="text"] {
+        width: 100%;
+        font-size: 16px; /* Prevents zoom on iOS */
+        padding: 12px 15px;
+    }
+
+    button {
+        width: 100%;
+        padding: 14px 20px;
+        font-size: 16px;
+    }
+
+    /* Playlist header should stack on mobile */
+    .playlist-header {
+        flex-direction: column;
+        align-items: center;
+        text-align: center;
+    }
+
+    .playlist-header img {
+        width: 120px;
+        height: 120px;
+    }
+
+    /* Action buttons should stack */
+    .action-buttons {
+        flex-direction: column;
+        width: 100%;
+    }
+
+    .action-buttons button {
+        width: 100%;
+    }
+
+    /* Results grid should stack on mobile */
+    .results {
+        grid-template-columns: 1fr;
+        gap: 15px;
+    }
+
+    /* Track list items */
+    .track-item {
+        padding: 10px;
+    }
+
+    .track-name {
+        font-size: 0.95em;
+    }
+
+    .track-artist {
+        font-size: 0.85em;
+    }
+
+    /* Progress section */
+    .progress-section {
+        padding: 15px;
+    }
+
+    .progress-section h3 {
+        font-size: 1.1em;
+    }
+
+    /* Hints and status messages */
+    .hint {
+        font-size: 0.85em;
+    }
+
+    .youtube-status {
+        padding: 10px 15px;
+        font-size: 0.9em;
+    }
+
+    .youtube-status small {
+        font-size: 0.8em;
+    }
+
+    /* Divider */
+    .divider {
+        margin: 20px 0;
+    }
+
+    .divider span {
+        font-size: 0.85em;
+    }
+
+    /* Input section headings */
+    .input-section h3 {
+        font-size: 1.15em;
+    }
+
+    /* Footer */
+    footer {
+        font-size: 0.85em;
+        margin-top: 30px;
+    }
+}
+
+/* Extra small devices (phones in portrait) */
+@media screen and (max-width: 480px) {
+    .container {
+        padding: 15px;
+    }
+
+    header h1 {
+        font-size: 1.5em;
+    }
+
+    header p {
+        font-size: 0.9em;
+    }
+
+    .toggle-btn {
+        padding: 8px 12px;
+        font-size: 13px;
+    }
+
+    button {
+        padding: 12px 18px;
+        font-size: 15px;
+    }
+
+    .playlist-header img {
+        width: 100px;
+        height: 100px;
+    }
+
+    .track-list {
+        max-height: 300px;
+    }
+
+    .progress-bar-container {
+        height: 25px;
+    }
+
+    .download-link {
+        font-size: 0.8em;
+        padding: 3px 10px;
+    }
+}
+
+/* Landscape orientation adjustments */
+@media screen and (max-width: 768px) and (orientation: landscape) {
+    .container {
+        max-width: 95%;
+    }
+
+    .playlist-header {
+        flex-direction: row;
+    }
+
+    .playlist-header img {
+        width: 100px;
+        height: 100px;
+    }
+}

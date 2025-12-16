@@ -14,6 +14,17 @@
         </header>
 
         <div class="input-section">
+            <div class="download-location-toggle">
+                <label>Download Location:</label>
+                <div class="toggle-buttons">
+                    <button type="button" class="toggle-btn active" id="serverToggle" onclick="setDownloadLocation('server')">
+                        💾 Save to Server
+                    </button>
+                    <button type="button" class="toggle-btn" id="deviceToggle" onclick="setDownloadLocation('device')">
+                        📱 Download to Device
+                    </button>
+                </div>
+            </div>
             <div class="input-group">
                 <input
                     type="text"

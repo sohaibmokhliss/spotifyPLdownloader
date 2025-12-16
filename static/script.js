@@ -1,4 +1,6 @@
 let progressInterval = null;
+let downloadLocation = 'device'; // Default to 'device' for public safety
+let allowServerStorage = false;
 
 function showError(message) {
     const errorDiv = document.getElementById('errorMessage');
@@ -111,27 +113,52 @@ async function downloadPlaylist(resume = false) {
             },
             body: JSON.stringify({
                 playlist_url: playlistUrl,
-                resume: resume
+                resume: resume,
+                download_to_device: downloadLocation === 'device'
             })
         });
 
-        const data = await response.json();
+        if (downloadLocation === 'device') {
+            // For device download, expect a ZIP file after completion
+            const blob = await response.blob();
+            if (!response.ok) {
+                const text = await blob.text();
+                const data = JSON.parse(text);
+                throw new Error(data.error || 'Download failed');
+            }
 
-        if (!response.ok) {
-            throw new Error(data.error || 'Download failed');
-        }
+            // Download the ZIP file
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'playlist.zip';
+            document.body.appendChild(a);
+            a.click();
+            window.URL.revokeObjectURL(url);
+            document.body.removeChild(a);
 
-        updateProgress();
-
-        if (data.paused) {
-            stopBtn.style.display = 'none';
-            resumeBtn.style.display = 'inline-block';
-            downloadBtn.disabled = false;
-            downloadBtn.textContent = '📥 Download All';
-        } else {
-            alert(`Download complete! ${data.completed} tracks downloaded successfully.`);
+            alert('Playlist ZIP file downloaded to your device!');
             stopBtn.style.display = 'none';
             resumeBtn.style.display = 'none';
+        } else {
+            const data = await response.json();
+
+            if (!response.ok) {
+                throw new Error(data.error || 'Download failed');
+            }
+
+            updateProgress();
+
+            if (data.paused) {
+                stopBtn.style.display = 'none';
+                resumeBtn.style.display = 'inline-block';
+                downloadBtn.disabled = false;
+                downloadBtn.textContent = '📥 Download All';
+            } else {
+                alert(`Download complete! ${data.completed} tracks downloaded successfully.`);
+                stopBtn.style.display = 'none';
+                resumeBtn.style.display = 'none';
+            }
         }
 
     } catch (error) {
@@ -252,17 +279,53 @@ async function downloadYouTube() {
             headers: {
                 'Content-Type': 'application/json'
             },
-            body: JSON.stringify({ youtube_url: youtubeUrl })
+            body: JSON.stringify({
+                youtube_url: youtubeUrl,
+                download_to_device: downloadLocation === 'device'
+            })
         });
 
-        const data = await response.json();
+        if (downloadLocation === 'device') {
+            // For device download, expect a file
+            const blob = await response.blob();
+            if (!response.ok) {
+                const text = await blob.text();
+                const data = JSON.parse(text);
+                throw new Error(data.error || 'Download failed');
+            }
 
-        if (!response.ok) {
-            throw new Error(data.error || 'Download failed');
+            // Extract filename from response headers or use default
+            const contentDisposition = response.headers.get('Content-Disposition');
+            let filename = 'video.mp3';
+            if (contentDisposition) {
+                const matches = /filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/.exec(contentDisposition);
+                if (matches != null && matches[1]) {
+                    filename = matches[1].replace(/['"]/g, '');
+                }
+            }
+
+            // Download the file
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            window.URL.revokeObjectURL(url);
+            document.body.removeChild(a);
+
+            statusDiv.className = 'youtube-status success';
+            statusDiv.textContent = `✅ Downloaded to your device: ${filename}`;
+        } else {
+            const data = await response.json();
+
+            if (!response.ok) {
+                throw new Error(data.error || 'Download failed');
+            }
+
+            statusDiv.className = 'youtube-status success';
+            statusDiv.textContent = `✅ ${data.message}`;
         }
-
-        statusDiv.className = 'youtube-status success';
-        statusDiv.textContent = `✅ ${data.message}`;
 
         document.getElementById('youtubeUrl').value = '';
 
@@ -298,23 +361,50 @@ async function createAllSongs() {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
-            }
+            },
+            body: JSON.stringify({
+                download_to_device: downloadLocation === 'device'
+            })
         });
 
-        const data = await response.json();
+        if (downloadLocation === 'device') {
+            // For device download, expect a ZIP file
+            const blob = await response.blob();
+            if (!response.ok) {
+                const text = await blob.text();
+                const data = JSON.parse(text);
+                throw new Error(data.error || 'Failed to create all_songs folder');
+            }
 
-        if (!response.ok) {
-            throw new Error(data.error || 'Failed to create all_songs folder');
+            // Download the ZIP file
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'all_songs.zip';
+            document.body.appendChild(a);
+            a.click();
+            window.URL.revokeObjectURL(url);
+            document.body.removeChild(a);
+
+            statusDiv.className = 'youtube-status success';
+            statusDiv.textContent = '✅ All songs ZIP file downloaded to your device!';
+        } else {
+            // For server save, expect JSON response
+            const data = await response.json();
+
+            if (!response.ok) {
+                throw new Error(data.error || 'Failed to create all_songs folder');
+            }
+
+            statusDiv.className = 'youtube-status success';
+            statusDiv.innerHTML = `
+                ✅ ${data.message}<br>
+                <small>Scanned: ${data.stats.total_files_scanned} files |
+                Unique: ${data.stats.unique_tracks} |
+                Duplicates: ${data.stats.duplicates_found} |
+                Copied: ${data.stats.files_copied}</small>
+            `;
         }
-
-        statusDiv.className = 'youtube-status success';
-        statusDiv.innerHTML = `
-            ✅ ${data.message}<br>
-            <small>Scanned: ${data.stats.total_files_scanned} files |
-            Unique: ${data.stats.unique_tracks} |
-            Duplicates: ${data.stats.duplicates_found} |
-            Copied: ${data.stats.files_copied}</small>
-        `;
 
         setTimeout(() => {
             statusDiv.style.display = 'none';
@@ -332,3 +422,46 @@ async function createAllSongs() {
         createBtn.textContent = '🎵 Create All Songs Folder';
     }
 }
+
+function setDownloadLocation(location) {
+    downloadLocation = location;
+
+    // Update UI
+    document.getElementById('serverToggle').classList.remove('active');
+    document.getElementById('deviceToggle').classList.remove('active');
+
+    if (location === 'server') {
+        document.getElementById('serverToggle').classList.add('active');
+    } else {
+        document.getElementById('deviceToggle').classList.add('active');
+    }
+}
+
+async function loadConfig() {
+    try {
+        const response = await fetch('/api/config');
+        const config = await response.json();
+
+        allowServerStorage = config.allow_server_storage;
+
+        const toggleSection = document.querySelector('.download-location-toggle');
+
+        if (!allowServerStorage) {
+            // Hide the toggle completely for public deployments
+            toggleSection.style.display = 'none';
+            downloadLocation = 'device'; // Force device downloads
+        } else {
+            // Show toggle for private deployments
+            toggleSection.style.display = 'block';
+            // Set initial state (device is still default for safety)
+            setDownloadLocation('device');
+        }
+    } catch (error) {
+        console.error('Failed to load config:', error);
+        // Default to device downloads if config fails
+        downloadLocation = 'device';
+    }
+}
+
+// Load configuration when page loads
+document.addEventListener('DOMContentLoaded', loadConfig);
