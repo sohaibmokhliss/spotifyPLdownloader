@@ -249,6 +249,113 @@ FLASK_PORT=5000              # Change port number
 FLASK_ENV=development        # Set to 'production' for deployment
 ```
 
+## 🚀 Deployment Guide
+
+### **For Public Hosting (Recommended Settings)**
+
+The app is configured by default to be safe for public access. All downloads go directly to users' devices, protecting your server storage.
+
+#### **Quick Deploy Steps:**
+
+1. **Set Environment Variables:**
+```bash
+# Required
+SPOTIFY_CLIENT_ID=your_client_id
+SPOTIFY_CLIENT_SECRET=your_client_secret
+
+# Recommended for public hosting
+ALLOW_SERVER_STORAGE=false  # Default - keeps your server storage safe
+FLASK_ENV=production
+FLASK_PORT=5000
+```
+
+2. **Install Dependencies:**
+```bash
+pip install -r requirements.txt
+```
+
+3. **Run with Production Server:**
+```bash
+# Using Gunicorn (recommended)
+pip install gunicorn
+gunicorn -w 4 -b 0.0.0.0:5000 app:app
+
+# Or using Flask (development only)
+python app.py
+```
+
+4. **Optional: Set up as a Service** (systemd example)
+```bash
+sudo nano /etc/systemd/system/spotify-downloader.service
+```
+
+```ini
+[Unit]
+Description=Spotify Playlist Downloader
+After=network.target
+
+[Service]
+User=youruser
+WorkingDirectory=/path/to/spotifyPLdownloader
+Environment="PATH=/path/to/venv/bin"
+ExecStart=/path/to/venv/bin/gunicorn -w 4 -b 0.0.0.0:5000 app:app
+Restart=always
+
+[Install]
+WantedBy=multi-user.target
+```
+
+```bash
+sudo systemctl enable spotify-downloader
+sudo systemctl start spotify-downloader
+```
+
+5. **Set up Reverse Proxy** (nginx example)
+```nginx
+server {
+    listen 80;
+    server_name your-domain.com;
+
+    location / {
+        proxy_pass http://127.0.0.1:5000;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+}
+```
+
+6. **Enable HTTPS** (using certbot)
+```bash
+sudo certbot --nginx -d your-domain.com
+```
+
+### **Security Considerations for Public Hosting:**
+
+✅ **Default Configuration is Safe:**
+- `ALLOW_SERVER_STORAGE=false` prevents users from filling your disk
+- All downloads go to users' devices automatically
+- No authentication required for basic usage
+
+⚠️ **Additional Security Measures:**
+- Use a reverse proxy (nginx/Apache) with rate limiting
+- Enable HTTPS for encrypted connections
+- Consider adding authentication for private deployments
+- Monitor server resources and set up alerts
+- Keep dependencies updated: `pip install -U -r requirements.txt`
+
+### **For Private/Personal Use:**
+
+If you want to save files to the server for personal use:
+
+```bash
+# In your .env file
+ALLOW_SERVER_STORAGE=true
+```
+
+This will show the download location toggle, allowing you to choose between server and device downloads.
+
 ## 🎯 Features Explained
 
 ### Playlist-Specific Folders
@@ -336,7 +443,16 @@ A: Songs are compared by filename (e.g., "Artist - Track.mp3"). If two songs hav
 A: Not currently. You can download individual YouTube videos, or use Spotify playlists which automatically search YouTube for each track.
 
 **Q: Can I run this on a server?**
-A: Yes! Set `FLASK_ENV=production` and consider using a production WSGI server like Gunicorn.
+A: Yes! Set `FLASK_ENV=production` and use a production WSGI server like Gunicorn. See the Deployment Guide section.
+
+**Q: Is it safe to host this publicly?**
+A: Yes! By default, `ALLOW_SERVER_STORAGE=false` means all downloads go to users' devices, not your server. Your disk space is protected.
+
+**Q: How do I prevent people from filling up my server storage?**
+A: The default configuration (`ALLOW_SERVER_STORAGE=false`) already does this. Users can only download files to their own devices.
+
+**Q: Can I host this for free?**
+A: Yes, you can deploy on platforms like Railway, Render, or Heroku. Just make sure FFmpeg is available in the environment.
 
 ---
 

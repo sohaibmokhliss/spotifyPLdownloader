@@ -21,6 +21,7 @@ YOUTUBE_API_KEY = os.getenv('YOUTUBE_API_KEY')
 RAPIDAPI_KEY = os.getenv('RAPIDAPI_KEY')
 RAPIDAPI_HOST = os.getenv('RAPIDAPI_HOST', 'youtube-to-mp315.p.rapidapi.com')
 DOWNLOAD_FOLDER = os.getenv('DOWNLOAD_FOLDER', 'downloads')
+ALLOW_SERVER_STORAGE = os.getenv('ALLOW_SERVER_STORAGE', 'false').lower() == 'true'
 
 # Create downloads folder
 os.makedirs(DOWNLOAD_FOLDER, exist_ok=True)
@@ -74,6 +75,13 @@ def sanitize_filename(filename):
 def index():
     """Serve main page"""
     return render_template('index.html')
+
+@app.route('/api/config', methods=['GET'])
+def get_config():
+    """Get app configuration"""
+    return jsonify({
+        'allow_server_storage': ALLOW_SERVER_STORAGE
+    })
 
 @app.route('/api/playlist/info', methods=['POST'])
 def get_playlist_info():
@@ -186,6 +194,7 @@ def download_playlist():
         data = request.get_json()
         playlist_url = data.get('playlist_url')
         resume = data.get('resume', False)
+        download_to_device = data.get('download_to_device', False)
 
         if not playlist_url:
             return jsonify({'error': 'Playlist URL is required'}), 400
@@ -197,9 +206,13 @@ def download_playlist():
         playlist = sp.playlist(playlist_id)
         playlist_name = sanitize_filename(playlist['name'])
 
-        # Create playlist-specific folder
-        playlist_folder = os.path.join(DOWNLOAD_FOLDER, playlist_name)
-        os.makedirs(playlist_folder, exist_ok=True)
+        # Choose download location
+        if download_to_device:
+            import tempfile
+            playlist_folder = tempfile.mkdtemp()
+        else:
+            playlist_folder = os.path.join(DOWNLOAD_FOLDER, playlist_name)
+            os.makedirs(playlist_folder, exist_ok=True)
 
         # Get all tracks
         tracks_info = []
@@ -287,12 +300,45 @@ def download_playlist():
 
         download_progress['status'] = 'completed'
 
-        return jsonify({
-            'success': True,
-            'message': f"Downloaded {len(download_progress['completed'])} of {download_progress['total']} tracks",
-            'completed': len(download_progress['completed']),
-            'failed': len(download_progress['failed'])
-        })
+        if download_to_device:
+            # Create ZIP file and send to client
+            import zipfile
+            import tempfile
+            import shutil
+
+            zip_path = os.path.join(tempfile.gettempdir(), f'{playlist_name}.zip')
+
+            with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED) as zipf:
+                for root, dirs, files in os.walk(playlist_folder):
+                    for file in files:
+                        if file.endswith('.mp3'):
+                            file_path = os.path.join(root, file)
+                            zipf.write(file_path, file)
+
+            response = send_from_directory(
+                os.path.dirname(zip_path),
+                os.path.basename(zip_path),
+                as_attachment=True,
+                download_name=f'{playlist_name}.zip'
+            )
+
+            # Clean up temp files after sending
+            @response.call_on_close
+            def cleanup():
+                try:
+                    shutil.rmtree(playlist_folder)
+                    os.remove(zip_path)
+                except:
+                    pass
+
+            return response
+        else:
+            return jsonify({
+                'success': True,
+                'message': f"Downloaded {len(download_progress['completed'])} of {download_progress['total']} tracks",
+                'completed': len(download_progress['completed']),
+                'failed': len(download_progress['failed'])
+            })
 
     except Exception as e:
         download_progress['status'] = 'error'
@@ -323,10 +369,11 @@ def resume_download():
 
 @app.route('/api/youtube/download', methods=['POST'])
 def download_youtube_direct():
-    """Download a single YouTube video directly to downloads folder"""
+    """Download a single YouTube video directly to downloads folder or send to client"""
     try:
         data = request.get_json()
         youtube_url = data.get('youtube_url')
+        download_to_device = data.get('download_to_device', False)
 
         if not youtube_url:
             return jsonify({'error': 'YouTube URL is required'}), 400
@@ -345,8 +392,15 @@ def download_youtube_direct():
             info = ydl.extract_info(youtube_url, download=False)
             video_title = sanitize_filename(info.get('title', 'video'))
 
-        # Download directly to downloads folder (not in a subfolder)
-        filepath = os.path.join(DOWNLOAD_FOLDER, video_title)
+        # Choose download location based on preference
+        if download_to_device:
+            # Download to temp folder first
+            import tempfile
+            temp_dir = tempfile.mkdtemp()
+            filepath = os.path.join(temp_dir, video_title)
+        else:
+            # Download directly to downloads folder
+            filepath = os.path.join(DOWNLOAD_FOLDER, video_title)
 
         ydl_opts = {
             'format': 'bestaudio/best',
@@ -363,11 +417,32 @@ def download_youtube_direct():
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             ydl.download([youtube_url])
 
-        return jsonify({
-            'success': True,
-            'message': f'Successfully downloaded: {video_title}',
-            'filename': f'{video_title}.mp3'
-        })
+        if download_to_device:
+            # Send file to client
+            mp3_file = f'{filepath}.mp3'
+            response = send_from_directory(
+                temp_dir,
+                f'{video_title}.mp3',
+                as_attachment=True,
+                download_name=f'{video_title}.mp3'
+            )
+
+            # Clean up temp file after sending
+            @response.call_on_close
+            def cleanup():
+                import shutil
+                try:
+                    shutil.rmtree(temp_dir)
+                except:
+                    pass
+
+            return response
+        else:
+            return jsonify({
+                'success': True,
+                'message': f'Successfully downloaded: {video_title}',
+                'filename': f'{video_title}.mp3'
+            })
 
     except Exception as e:
         return jsonify({'error': f'Download failed: {str(e)}'}), 500
@@ -379,14 +454,13 @@ def download_file(filename):
 
 @app.route('/api/create-all-songs', methods=['POST'])
 def create_all_songs_playlist():
-    """Scan downloads folder and create deduplicated all_songs folder"""
+    """Scan downloads folder and create deduplicated all_songs folder or ZIP"""
     try:
         import shutil
         from pathlib import Path
 
-        # Create all_songs folder
-        all_songs_folder = os.path.join(DOWNLOAD_FOLDER, 'all_songs')
-        os.makedirs(all_songs_folder, exist_ok=True)
+        data = request.get_json()
+        download_to_device = data.get('download_to_device', False)
 
         # Track unique songs by filename (without path)
         unique_songs = {}
@@ -410,26 +484,58 @@ def create_all_songs_playlist():
             else:
                 duplicates += 1
 
-        # Copy unique files to all_songs folder
-        copied = 0
-        for filename, source_path in unique_songs.items():
-            dest_path = os.path.join(all_songs_folder, filename)
+        if download_to_device:
+            # Create ZIP file with all unique songs and send to client
+            import zipfile
+            import tempfile
 
-            # Only copy if destination doesn't exist or source is newer
-            if not os.path.exists(dest_path):
-                shutil.copy2(source_path, dest_path)
-                copied += 1
+            zip_path = os.path.join(tempfile.gettempdir(), 'all_songs.zip')
 
-        return jsonify({
-            'success': True,
-            'message': f'Created all_songs folder with {len(unique_songs)} unique tracks',
-            'stats': {
-                'total_files_scanned': total_files,
-                'unique_tracks': len(unique_songs),
-                'duplicates_found': duplicates,
-                'files_copied': copied
-            }
-        })
+            with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED) as zipf:
+                for filename, source_path in unique_songs.items():
+                    zipf.write(source_path, filename)
+
+            response = send_from_directory(
+                os.path.dirname(zip_path),
+                os.path.basename(zip_path),
+                as_attachment=True,
+                download_name='all_songs.zip'
+            )
+
+            # Clean up temp file after sending
+            @response.call_on_close
+            def cleanup():
+                try:
+                    os.remove(zip_path)
+                except:
+                    pass
+
+            return response
+        else:
+            # Create all_songs folder on server
+            all_songs_folder = os.path.join(DOWNLOAD_FOLDER, 'all_songs')
+            os.makedirs(all_songs_folder, exist_ok=True)
+
+            # Copy unique files to all_songs folder
+            copied = 0
+            for filename, source_path in unique_songs.items():
+                dest_path = os.path.join(all_songs_folder, filename)
+
+                # Only copy if destination doesn't exist
+                if not os.path.exists(dest_path):
+                    shutil.copy2(source_path, dest_path)
+                    copied += 1
+
+            return jsonify({
+                'success': True,
+                'message': f'Created all_songs folder with {len(unique_songs)} unique tracks',
+                'stats': {
+                    'total_files_scanned': total_files,
+                    'unique_tracks': len(unique_songs),
+                    'duplicates_found': duplicates,
+                    'files_copied': copied
+                }
+            })
 
     except Exception as e:
         return jsonify({'error': f'Failed to create all_songs folder: {str(e)}'}), 500
