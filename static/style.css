@@ -327,3 +327,78 @@ footer {
     animation: spin 1s linear infinite;
     margin-left: 10px;
 }
+
+.divider {
+    display: flex;
+    align-items: center;
+    text-align: center;
+    margin: 30px 0;
+    color: #888;
+}
+
+.divider::before,
+.divider::after {
+    content: '';
+    flex: 1;
+    border-bottom: 2px solid #ddd;
+}
+
+.divider span {
+    padding: 0 15px;
+    font-weight: 600;
+    font-size: 0.9em;
+}
+
+.input-section h3 {
+    color: #333;
+    margin-bottom: 15px;
+    font-size: 1.3em;
+}
+
+.youtube-status {
+    margin-top: 15px;
+    padding: 12px 20px;
+    border-radius: 8px;
+    font-weight: 500;
+    text-align: center;
+    transition: all 0.3s ease;
+}
+
+.youtube-status.downloading {
+    background: #e3f2fd;
+    color: #1976d2;
+    border: 1px solid #1976d2;
+}
+
+.youtube-status.success {
+    background: #e8f5e9;
+    color: #2e7d32;
+    border: 1px solid #2e7d32;
+}
+
+.youtube-status.error {
+    background: #ffebee;
+    color: #c62828;
+    border: 1px solid #c62828;
+}
+
+.organize-btn {
+    background: #ff9800;
+    padding: 15px 40px;
+    font-size: 18px;
+}
+
+.organize-btn:hover {
+    background: #f57c00;
+}
+
+.organize-btn:disabled {
+    background: #ccc;
+}
+
+.youtube-status small {
+    display: block;
+    margin-top: 8px;
+    font-size: 0.85em;
+    opacity: 0.9;
+}

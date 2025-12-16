@@ -13,6 +13,8 @@ A powerful web application to download songs from your Spotify playlists locally
 - 📥 Download as high-quality MP3 files (192kbps)
 - 📁 **Auto-organize: Each playlist gets its own folder**
 - ⏸️ **Stop/Resume: Pause and resume downloads anytime**
+- 🎬 **Direct YouTube Download: Download any YouTube video as MP3**
+- 🎵 **Smart Deduplication: Combine all songs into one folder without duplicates**
 - 📊 Real-time progress tracking
 - 🎨 Clean, responsive web interface
 - 💾 Runs completely locally
@@ -106,27 +108,42 @@ The app will be accessible at:
 
 ## 📖 How to Use
 
-### 1. Get Spotify Playlist URL
+### 1. Download Spotify Playlists
 
+#### Get Spotify Playlist URL
 - Open Spotify (desktop or mobile)
 - Go to any playlist
 - Click Share → Copy link to playlist
 - Example: `https://open.spotify.com/playlist/37i9dQZF1DXcBWIGoYBM5M`
 
-### 2. Fetch Playlist
-
+#### Fetch and Download
 - Open the app in your browser
 - Paste the playlist URL
 - Click "Fetch Playlist"
 - Review the tracks
-
-### 3. Download
-
 - Click "📥 Download All" to start
 - **Use "⏸️ Stop Download"** to pause after the current track
 - **Use "▶️ Resume Download"** to continue from where you left off
 - Watch real-time progress
 - Find downloaded files in `downloads/PLAYLIST_NAME/` folder
+
+### 2. Download YouTube Videos Directly
+
+- Scroll to the "Direct YouTube Download" section
+- Paste any YouTube video URL
+- Click "Download MP3"
+- Files are saved directly to `downloads/` folder (not in a playlist subfolder)
+- Example: `https://www.youtube.com/watch?v=dQw4w9WgXcQ`
+
+### 3. Create Deduplicated All Songs Folder
+
+- After downloading multiple playlists, scroll to the "ORGANIZE" section
+- Click "🎵 Create All Songs Folder"
+- The app will:
+  - Scan all MP3 files in your downloads folder
+  - Identify and remove duplicates
+  - Copy unique songs to `downloads/all_songs/` folder
+- View statistics showing files scanned, unique tracks, and duplicates found
 
 ### 4. Access from Other Devices
 
@@ -176,9 +193,11 @@ spotifyPLdownloader/
 2. **YouTube Search**: Searches for matching videos using youtube-search-python
 3. **MP3 Download**: Downloads and converts to MP3 using yt-dlp (no API keys required!)
 4. **Smart Organization**: Creates separate folders for each playlist automatically
-5. **Progress Tracking**: Real-time updates via polling endpoint
-6. **Resume Support**: Tracks completed downloads to skip them when resuming
-7. **File Management**: Saves MP3 files with sanitized filenames
+5. **Direct YouTube Downloads**: Extract and download any YouTube video directly to MP3
+6. **Deduplication**: Scans all downloads recursively and identifies duplicates by filename
+7. **Progress Tracking**: Real-time updates via polling endpoint
+8. **Resume Support**: Tracks completed downloads to skip them when resuming
+9. **File Management**: Saves MP3 files with sanitized filenames
 
 ## 🔧 Troubleshooting
 
@@ -233,7 +252,7 @@ FLASK_ENV=development        # Set to 'production' for deployment
 ## 🎯 Features Explained
 
 ### Playlist-Specific Folders
-Each playlist is downloaded into its own folder named after the playlist:
+Each Spotify playlist is downloaded into its own folder named after the playlist:
 ```
 downloads/
 ├── Chill Vibes/
@@ -242,6 +261,11 @@ downloads/
 ├── Workout Mix/
 │   ├── Artist - Song 3.mp3
 │   └── Artist - Song 4.mp3
+├── video_title.mp3         # Direct YouTube downloads
+└── all_songs/              # Deduplicated collection
+    ├── Artist - Song 1.mp3
+    ├── Artist - Song 3.mp3
+    └── Artist - Song 4.mp3
 ```
 
 ### Stop/Resume Functionality
@@ -249,6 +273,19 @@ downloads/
 - **Resume**: Continue from exactly where you left off
 - Already downloaded tracks are automatically skipped
 - Perfect for large playlists or unstable connections
+
+### Direct YouTube Download
+- Download any YouTube video directly as MP3
+- No need to create a playlist first
+- Files go directly to `downloads/` folder
+- Perfect for single songs or videos
+
+### Smart Deduplication
+- Scans all playlists and finds duplicate songs
+- Creates `all_songs/` folder with unique tracks only
+- Shows detailed statistics (files scanned, duplicates found, etc.)
+- Non-destructive - original playlist folders remain untouched
+- Perfect for creating a master library from multiple playlists
 
 ## 🤝 Contributing
 
@@ -278,7 +315,7 @@ This project is for educational purposes only. Use responsibly and respect copyr
 A: No! The app uses yt-dlp which is completely free. You only need free Spotify API credentials.
 
 **Q: Can I download private playlists?**
-A: No, only public playlists are supported.
+A: No, only public Spotify playlists are supported. However, you can download any public YouTube video directly.
 
 **Q: What quality are the downloads?**
 A: MP3 files at 192kbps, which provides excellent quality for most use cases.
@@ -287,7 +324,16 @@ A: MP3 files at 192kbps, which provides excellent quality for most use cases.
 A: The app handles one download session at a time. Multiple users can access it, but downloads will queue.
 
 **Q: Where are my downloaded files?**
-A: In the `downloads/` folder, organized by playlist name.
+A: In the `downloads/` folder. Spotify playlists get their own subfolders, YouTube direct downloads go to the root downloads folder, and deduplicated songs go to `downloads/all_songs/`.
+
+**Q: What happens to my original playlists when I create the all_songs folder?**
+A: Nothing! The deduplication feature copies files, it doesn't move them. Your original playlist folders remain untouched.
+
+**Q: How does the app detect duplicates?**
+A: Songs are compared by filename (e.g., "Artist - Track.mp3"). If two songs have the same filename, they're considered duplicates and only one copy is kept in the all_songs folder.
+
+**Q: Can I download YouTube playlists?**
+A: Not currently. You can download individual YouTube videos, or use Spotify playlists which automatically search YouTube for each track.
 
 **Q: Can I run this on a server?**
 A: Yes! Set `FLASK_ENV=production` and consider using a production WSGI server like Gunicorn.
