@@ -321,10 +321,118 @@ def resume_download():
     # Call download with resume flag
     return download_playlist()
 
+@app.route('/api/youtube/download', methods=['POST'])
+def download_youtube_direct():
+    """Download a single YouTube video directly to downloads folder"""
+    try:
+        data = request.get_json()
+        youtube_url = data.get('youtube_url')
+
+        if not youtube_url:
+            return jsonify({'error': 'YouTube URL is required'}), 400
+
+        # Validate YouTube URL
+        if 'youtube.com' not in youtube_url and 'youtu.be' not in youtube_url:
+            return jsonify({'error': 'Invalid YouTube URL'}), 400
+
+        # Get video info first to extract title
+        ydl_opts_info = {
+            'quiet': True,
+            'no_warnings': True,
+        }
+
+        with yt_dlp.YoutubeDL(ydl_opts_info) as ydl:
+            info = ydl.extract_info(youtube_url, download=False)
+            video_title = sanitize_filename(info.get('title', 'video'))
+
+        # Download directly to downloads folder (not in a subfolder)
+        filepath = os.path.join(DOWNLOAD_FOLDER, video_title)
+
+        ydl_opts = {
+            'format': 'bestaudio/best',
+            'postprocessors': [{
+                'key': 'FFmpegExtractAudio',
+                'preferredcodec': 'mp3',
+                'preferredquality': '192',
+            }],
+            'outtmpl': filepath,
+            'quiet': True,
+            'no_warnings': True,
+        }
+
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            ydl.download([youtube_url])
+
+        return jsonify({
+            'success': True,
+            'message': f'Successfully downloaded: {video_title}',
+            'filename': f'{video_title}.mp3'
+        })
+
+    except Exception as e:
+        return jsonify({'error': f'Download failed: {str(e)}'}), 500
+
 @app.route('/downloads/<path:filename>')
 def download_file(filename):
     """Serve downloaded files"""
     return send_from_directory(DOWNLOAD_FOLDER, filename, as_attachment=True)
+
+@app.route('/api/create-all-songs', methods=['POST'])
+def create_all_songs_playlist():
+    """Scan downloads folder and create deduplicated all_songs folder"""
+    try:
+        import shutil
+        from pathlib import Path
+
+        # Create all_songs folder
+        all_songs_folder = os.path.join(DOWNLOAD_FOLDER, 'all_songs')
+        os.makedirs(all_songs_folder, exist_ok=True)
+
+        # Track unique songs by filename (without path)
+        unique_songs = {}
+        total_files = 0
+        duplicates = 0
+
+        # Recursively scan downloads folder for .mp3 files
+        downloads_path = Path(DOWNLOAD_FOLDER)
+
+        for mp3_file in downloads_path.rglob('*.mp3'):
+            # Skip files already in all_songs folder
+            if 'all_songs' in str(mp3_file):
+                continue
+
+            total_files += 1
+            filename = mp3_file.name
+
+            # Check if we've seen this filename before
+            if filename not in unique_songs:
+                unique_songs[filename] = str(mp3_file)
+            else:
+                duplicates += 1
+
+        # Copy unique files to all_songs folder
+        copied = 0
+        for filename, source_path in unique_songs.items():
+            dest_path = os.path.join(all_songs_folder, filename)
+
+            # Only copy if destination doesn't exist or source is newer
+            if not os.path.exists(dest_path):
+                shutil.copy2(source_path, dest_path)
+                copied += 1
+
+        return jsonify({
+            'success': True,
+            'message': f'Created all_songs folder with {len(unique_songs)} unique tracks',
+            'stats': {
+                'total_files_scanned': total_files,
+                'unique_tracks': len(unique_songs),
+                'duplicates_found': duplicates,
+                'files_copied': copied
+            }
+        })
+
+    except Exception as e:
+        return jsonify({'error': f'Failed to create all_songs folder: {str(e)}'}), 500
 
 if __name__ == '__main__':
     port = int(os.getenv('FLASK_PORT', 5000))

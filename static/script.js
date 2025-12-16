@@ -222,3 +222,113 @@ document.getElementById('playlistUrl').addEventListener('keypress', function(eve
         fetchPlaylist();
     }
 });
+
+document.getElementById('youtubeUrl').addEventListener('keypress', function(event) {
+    if (event.key === 'Enter') {
+        downloadYouTube();
+    }
+});
+
+async function downloadYouTube() {
+    const youtubeUrl = document.getElementById('youtubeUrl').value.trim();
+
+    if (!youtubeUrl) {
+        showError('Please enter a YouTube URL');
+        return;
+    }
+
+    const youtubeBtn = document.getElementById('youtubeDownloadBtn');
+    const statusDiv = document.getElementById('youtubeStatus');
+
+    youtubeBtn.disabled = true;
+    youtubeBtn.textContent = 'Downloading...';
+    statusDiv.style.display = 'block';
+    statusDiv.className = 'youtube-status downloading';
+    statusDiv.textContent = 'Downloading video from YouTube...';
+
+    try {
+        const response = await fetch('/api/youtube/download', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ youtube_url: youtubeUrl })
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+            throw new Error(data.error || 'Download failed');
+        }
+
+        statusDiv.className = 'youtube-status success';
+        statusDiv.textContent = `✅ ${data.message}`;
+
+        document.getElementById('youtubeUrl').value = '';
+
+        setTimeout(() => {
+            statusDiv.style.display = 'none';
+        }, 5000);
+
+    } catch (error) {
+        statusDiv.className = 'youtube-status error';
+        statusDiv.textContent = `❌ ${error.message}`;
+
+        setTimeout(() => {
+            statusDiv.style.display = 'none';
+        }, 5000);
+    } finally {
+        youtubeBtn.disabled = false;
+        youtubeBtn.textContent = 'Download MP3';
+    }
+}
+
+async function createAllSongs() {
+    const createBtn = document.getElementById('createAllSongsBtn');
+    const statusDiv = document.getElementById('allSongsStatus');
+
+    createBtn.disabled = true;
+    createBtn.textContent = 'Processing...';
+    statusDiv.style.display = 'block';
+    statusDiv.className = 'youtube-status downloading';
+    statusDiv.textContent = 'Scanning downloads folder and removing duplicates...';
+
+    try {
+        const response = await fetch('/api/create-all-songs', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            }
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+            throw new Error(data.error || 'Failed to create all_songs folder');
+        }
+
+        statusDiv.className = 'youtube-status success';
+        statusDiv.innerHTML = `
+            ✅ ${data.message}<br>
+            <small>Scanned: ${data.stats.total_files_scanned} files |
+            Unique: ${data.stats.unique_tracks} |
+            Duplicates: ${data.stats.duplicates_found} |
+            Copied: ${data.stats.files_copied}</small>
+        `;
+
+        setTimeout(() => {
+            statusDiv.style.display = 'none';
+        }, 10000);
+
+    } catch (error) {
+        statusDiv.className = 'youtube-status error';
+        statusDiv.textContent = `❌ ${error.message}`;
+
+        setTimeout(() => {
+            statusDiv.style.display = 'none';
+        }, 5000);
+    } finally {
+        createBtn.disabled = false;
+        createBtn.textContent = '🎵 Create All Songs Folder';
+    }
+}

@@ -15,15 +15,34 @@
 
         <div class="input-section">
             <div class="input-group">
-                <input 
-                    type="text" 
-                    id="playlistUrl" 
+                <input
+                    type="text"
+                    id="playlistUrl"
                     placeholder="Paste Spotify playlist URL here..."
                     autocomplete="off"
                 >
                 <button id="fetchBtn" onclick="fetchPlaylist()">Fetch Playlist</button>
             </div>
             <p class="hint">Example: https://open.spotify.com/playlist/37i9dQZF1DXcBWIGoYBM5M</p>
+        </div>
+
+        <div class="divider">
+            <span>OR</span>
+        </div>
+
+        <div class="input-section">
+            <h3>🎬 Direct YouTube Download</h3>
+            <div class="input-group">
+                <input
+                    type="text"
+                    id="youtubeUrl"
+                    placeholder="Paste YouTube video URL here..."
+                    autocomplete="off"
+                >
+                <button id="youtubeDownloadBtn" onclick="downloadYouTube()">Download MP3</button>
+            </div>
+            <p class="hint">Example: https://www.youtube.com/watch?v=dQw4w9WgXcQ</p>
+            <div id="youtubeStatus" class="youtube-status" style="display: none;"></div>
         </div>
 
         <div id="playlistInfo" class="playlist-info" style="display: none;">
@@ -75,6 +94,21 @@
         </div>
 
         <div id="errorMessage" class="error-message" style="display: none;"></div>
+
+        <div class="divider">
+            <span>ORGANIZE</span>
+        </div>
+
+        <div class="input-section">
+            <h3>📁 Create Combined Playlist</h3>
+            <p class="hint">Scan all downloaded songs and create a deduplicated "all_songs" folder</p>
+            <div class="action-buttons">
+                <button id="createAllSongsBtn" onclick="createAllSongs()" class="organize-btn">
+                    🎵 Create All Songs Folder
+                </button>
+            </div>
+            <div id="allSongsStatus" class="youtube-status" style="display: none;"></div>
+        </div>
 
         <footer>
             <p>⚠️ For personal use only. Respect copyright laws.</p>
