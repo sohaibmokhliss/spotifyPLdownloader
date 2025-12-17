@@ -346,82 +346,6 @@ async function downloadYouTube() {
     }
 }
 
-async function createAllSongs() {
-    const createBtn = document.getElementById('createAllSongsBtn');
-    const statusDiv = document.getElementById('allSongsStatus');
-
-    createBtn.disabled = true;
-    createBtn.textContent = 'Processing...';
-    statusDiv.style.display = 'block';
-    statusDiv.className = 'youtube-status downloading';
-    statusDiv.textContent = 'Scanning downloads folder and removing duplicates...';
-
-    try {
-        const response = await fetch('/api/create-all-songs', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-                download_to_device: downloadLocation === 'device'
-            })
-        });
-
-        if (downloadLocation === 'device') {
-            // For device download, expect a ZIP file
-            const blob = await response.blob();
-            if (!response.ok) {
-                const text = await blob.text();
-                const data = JSON.parse(text);
-                throw new Error(data.error || 'Failed to create all_songs folder');
-            }
-
-            // Download the ZIP file
-            const url = window.URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = 'all_songs.zip';
-            document.body.appendChild(a);
-            a.click();
-            window.URL.revokeObjectURL(url);
-            document.body.removeChild(a);
-
-            statusDiv.className = 'youtube-status success';
-            statusDiv.textContent = '✅ All songs ZIP file downloaded to your device!';
-        } else {
-            // For server save, expect JSON response
-            const data = await response.json();
-
-            if (!response.ok) {
-                throw new Error(data.error || 'Failed to create all_songs folder');
-            }
-
-            statusDiv.className = 'youtube-status success';
-            statusDiv.innerHTML = `
-                ✅ ${data.message}<br>
-                <small>Scanned: ${data.stats.total_files_scanned} files |
-                Unique: ${data.stats.unique_tracks} |
-                Duplicates: ${data.stats.duplicates_found} |
-                Copied: ${data.stats.files_copied}</small>
-            `;
-        }
-
-        setTimeout(() => {
-            statusDiv.style.display = 'none';
-        }, 10000);
-
-    } catch (error) {
-        statusDiv.className = 'youtube-status error';
-        statusDiv.textContent = `❌ ${error.message}`;
-
-        setTimeout(() => {
-            statusDiv.style.display = 'none';
-        }, 5000);
-    } finally {
-        createBtn.disabled = false;
-        createBtn.textContent = '🎵 Create All Songs Folder';
-    }
-}
 
 function setDownloadLocation(location) {
     downloadLocation = location;
@@ -463,5 +387,40 @@ async function loadConfig() {
     }
 }
 
-// Load configuration when page loads
-document.addEventListener('DOMContentLoaded', loadConfig);
+async function loadCurrentUser() {
+    try {
+        const response = await fetch('/api/auth/me');
+        const data = await response.json();
+
+        if (data.authenticated) {
+            document.getElementById('username').textContent = `Logged in as: ${data.user.username}`;
+
+            // Show admin link if user is admin
+            if (data.user.is_admin) {
+                document.getElementById('adminLink').style.display = 'inline-block';
+            }
+        } else {
+            // Redirect to login if not authenticated
+            window.location.href = '/login';
+        }
+    } catch (error) {
+        console.error('Failed to load user:', error);
+        window.location.href = '/login';
+    }
+}
+
+async function handleLogout() {
+    try {
+        await fetch('/api/auth/logout', { method: 'POST' });
+        window.location.href = '/login';
+    } catch (error) {
+        console.error('Logout failed:', error);
+        window.location.href = '/login';
+    }
+}
+
+// Load configuration and user when page loads
+document.addEventListener('DOMContentLoaded', () => {
+    loadConfig();
+    loadCurrentUser();
+});

@@ -1,0 +1,394 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Dashboard - Spotify Playlist Downloader</title>
+    <style>
+        .admin-container {
+            max-width: 1400px;
+            margin: 20px auto;
+            padding: 20px;
+        }
+
+        .admin-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 30px;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+
+        .stat-card {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 25px;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+
+        .stat-card h3 {
+            margin: 0 0 10px 0;
+            font-size: 0.9em;
+            opacity: 0.9;
+        }
+
+        .stat-card .stat-value {
+            font-size: 2.5em;
+            font-weight: bold;
+            margin: 0;
+        }
+
+        .section {
+            background: white;
+            padding: 25px;
+            border-radius: 12px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            margin-bottom: 25px;
+        }
+
+        .section h2 {
+            margin-top: 0;
+            color: #333;
+            border-bottom: 2px solid #667eea;
+            padding-bottom: 10px;
+        }
+
+        .tabs {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+            border-bottom: 2px solid #ddd;
+        }
+
+        .tab {
+            padding: 12px 24px;
+            background: none;
+            border: none;
+            border-bottom: 3px solid transparent;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: 600;
+            color: #666;
+            transition: all 0.3s;
+        }
+
+        .tab.active {
+            color: #667eea;
+            border-bottom-color: #667eea;
+        }
+
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        table th {
+            background: #f5f5f5;
+            padding: 12px;
+            text-align: left;
+            font-weight: 600;
+            color: #333;
+            border-bottom: 2px solid #ddd;
+        }
+
+        table td {
+            padding: 12px;
+            border-bottom: 1px solid #eee;
+        }
+
+        table tr:hover {
+            background: #f9f9f9;
+        }
+
+        .badge {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 12px;
+            font-size: 0.85em;
+            font-weight: 600;
+        }
+
+        .badge.success {
+            background: #e8f5e9;
+            color: #2e7d32;
+        }
+
+        .badge.error {
+            background: #ffebee;
+            color: #c62828;
+        }
+
+        .badge.admin {
+            background: #fff3e0;
+            color: #e65100;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: #666;
+        }
+
+        .back-button {
+            padding: 10px 20px;
+            background: #667eea;
+            color: white;
+            text-decoration: none;
+            border-radius: 8px;
+            font-weight: 600;
+        }
+
+        .back-button:hover {
+            background: #5568d3;
+        }
+
+        @media (max-width: 768px) {
+            .stats-grid {
+                grid-template-columns: 1fr;
+            }
+
+            table {
+                font-size: 0.9em;
+            }
+
+            .admin-header {
+                flex-direction: column;
+                gap: 15px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container admin-container">
+        <div class="admin-header">
+            <div>
+                <h1>📊 Admin Dashboard</h1>
+                <p>System statistics and user activity</p>
+            </div>
+            <a href="/" class="back-button">← Back to App</a>
+        </div>
+
+        <!-- Statistics Cards -->
+        <div class="stats-grid" id="statsGrid">
+            <div class="loading">Loading statistics...</div>
+        </div>
+
+        <!-- Tabs Section -->
+        <div class="section">
+            <div class="tabs">
+                <button class="tab active" onclick="switchTab('users')">Users</button>
+                <button class="tab" onclick="switchTab('activity')">Activity Logs</button>
+                <button class="tab" onclick="switchTab('downloads')">Download History</button>
+            </div>
+
+            <!-- Users Tab -->
+            <div id="users" class="tab-content active">
+                <h2>All Users</h2>
+                <div id="usersTable" class="loading">Loading users...</div>
+            </div>
+
+            <!-- Activity Tab -->
+            <div id="activity" class="tab-content">
+                <h2>Recent Activity</h2>
+                <div id="activityTable" class="loading">Loading activity...</div>
+            </div>
+
+            <!-- Downloads Tab -->
+            <div id="downloads" class="tab-content">
+                <h2>Download History</h2>
+                <div id="downloadsTable" class="loading">Loading downloads...</div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function switchTab(tabName) {
+            // Update tabs
+            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+            event.target.classList.add('active');
+
+            // Update content
+            document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+            document.getElementById(tabName).classList.add('active');
+        }
+
+        async function loadStats() {
+            try {
+                const response = await fetch('/api/admin/stats');
+                const stats = await response.json();
+
+                const statsHtml = `
+                    <div class="stat-card">
+                        <h3>Total Users</h3>
+                        <p class="stat-value">${stats.total_users || 0}</p>
+                    </div>
+                    <div class="stat-card" style="background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);">
+                        <h3>Total Downloads</h3>
+                        <p class="stat-value">${stats.total_downloads || 0}</p>
+                    </div>
+                    <div class="stat-card" style="background: linear-gradient(135deg, #ee0979 0%, #ff6a00 100%);">
+                        <h3>Failed Downloads</h3>
+                        <p class="stat-value">${stats.failed_downloads || 0}</p>
+                    </div>
+                    <div class="stat-card" style="background: linear-gradient(135deg, #fc4a1a 0%, #f7b733 100%);">
+                        <h3>Active Sessions</h3>
+                        <p class="stat-value">${stats.active_sessions || 0}</p>
+                    </div>
+                    <div class="stat-card" style="background: linear-gradient(135deg, #4776e6 0%, #8e54e9 100%);">
+                        <h3>Activity (24h)</h3>
+                        <p class="stat-value">${stats.activity_last_24h || 0}</p>
+                    </div>
+                `;
+
+                document.getElementById('statsGrid').innerHTML = statsHtml;
+            } catch (error) {
+                console.error('Failed to load stats:', error);
+                document.getElementById('statsGrid').innerHTML = '<div class="loading">Failed to load statistics</div>';
+            }
+        }
+
+        async function loadUsers() {
+            try {
+                const response = await fetch('/api/admin/users');
+                const data = await response.json();
+
+                const tableHtml = `
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Username</th>
+                                <th>Email</th>
+                                <th>Role</th>
+                                <th>Downloads</th>
+                                <th>Activities</th>
+                                <th>Created</th>
+                                <th>Last Login</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${data.users.map(user => `
+                                <tr>
+                                    <td><strong>${user.username}</strong></td>
+                                    <td>${user.email || '-'}</td>
+                                    <td>${user.is_admin ? '<span class="badge admin">Admin</span>' : 'User'}</td>
+                                    <td>${user.total_downloads}</td>
+                                    <td>${user.total_activities}</td>
+                                    <td>${new Date(user.created_at).toLocaleDateString()}</td>
+                                    <td>${user.last_login ? new Date(user.last_login).toLocaleString() : 'Never'}</td>
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                    </table>
+                `;
+
+                document.getElementById('usersTable').innerHTML = tableHtml;
+            } catch (error) {
+                console.error('Failed to load users:', error);
+                document.getElementById('usersTable').innerHTML = '<div class="loading">Failed to load users</div>';
+            }
+        }
+
+        async function loadActivity() {
+            try {
+                const response = await fetch('/api/admin/activity?limit=100');
+                const data = await response.json();
+
+                const tableHtml = `
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Time</th>
+                                <th>User</th>
+                                <th>Action</th>
+                                <th>Details</th>
+                                <th>IP Address</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${data.activities.map(activity => `
+                                <tr>
+                                    <td>${new Date(activity.timestamp).toLocaleString()}</td>
+                                    <td><strong>${activity.username || 'Unknown'}</strong></td>
+                                    <td><span class="badge">${activity.action}</span></td>
+                                    <td>${activity.details || '-'}</td>
+                                    <td>${activity.ip_address || '-'}</td>
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                    </table>
+                `;
+
+                document.getElementById('activityTable').innerHTML = tableHtml;
+            } catch (error) {
+                console.error('Failed to load activity:', error);
+                document.getElementById('activityTable').innerHTML = '<div class="loading">Failed to load activity</div>';
+            }
+        }
+
+        async function loadDownloads() {
+            try {
+                const response = await fetch('/api/admin/downloads?limit=100');
+                const data = await response.json();
+
+                const tableHtml = `
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Time</th>
+                                <th>User</th>
+                                <th>Type</th>
+                                <th>Item</th>
+                                <th>Status</th>
+                                <th>IP Address</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${data.downloads.map(download => `
+                                <tr>
+                                    <td>${new Date(download.timestamp).toLocaleString()}</td>
+                                    <td><strong>${download.username || 'Unknown'}</strong></td>
+                                    <td>${download.download_type}</td>
+                                    <td>${download.item_name}</td>
+                                    <td>${download.success ? '<span class="badge success">Success</span>' : '<span class="badge error">Failed</span>'}</td>
+                                    <td>${download.ip_address || '-'}</td>
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                    </table>
+                `;
+
+                document.getElementById('downloadsTable').innerHTML = tableHtml;
+            } catch (error) {
+                console.error('Failed to load downloads:', error);
+                document.getElementById('downloadsTable').innerHTML = '<div class="loading">Failed to load downloads</div>';
+            }
+        }
+
+        // Load all data on page load
+        document.addEventListener('DOMContentLoaded', () => {
+            loadStats();
+            loadUsers();
+            loadActivity();
+            loadDownloads();
+
+            // Refresh stats every 30 seconds
+            setInterval(loadStats, 30000);
+        });
+    </script>
+</body>
+</html>

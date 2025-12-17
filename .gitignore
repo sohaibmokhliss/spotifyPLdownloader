@@ -1,6 +1,10 @@
 # Environment variables
 .env
 
+# Database
+app.db
+*.db
+
 # Downloads folder
 downloads/
 
