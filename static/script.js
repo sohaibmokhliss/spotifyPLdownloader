@@ -258,6 +258,7 @@ document.getElementById('youtubeUrl').addEventListener('keypress', function(even
 
 async function downloadYouTube() {
     const youtubeUrl = document.getElementById('youtubeUrl').value.trim();
+    const format = document.querySelector('input[name="downloadFormat"]:checked').value;
 
     if (!youtubeUrl) {
         showError('Please enter a YouTube URL');
@@ -271,7 +272,7 @@ async function downloadYouTube() {
     youtubeBtn.textContent = 'Downloading...';
     statusDiv.style.display = 'block';
     statusDiv.className = 'youtube-status downloading';
-    statusDiv.textContent = 'Downloading video from YouTube...';
+    statusDiv.textContent = `Downloading ${format.toUpperCase()} from YouTube...`;
 
     try {
         const response = await fetch('/api/youtube/download', {
@@ -281,7 +282,8 @@ async function downloadYouTube() {
             },
             body: JSON.stringify({
                 youtube_url: youtubeUrl,
-                download_to_device: downloadLocation === 'device'
+                download_to_device: downloadLocation === 'device',
+                format: format
             })
         });
 
@@ -296,7 +298,7 @@ async function downloadYouTube() {
 
             // Extract filename from response headers or use default
             const contentDisposition = response.headers.get('Content-Disposition');
-            let filename = 'video.mp3';
+            let filename = `video.${format}`;
             if (contentDisposition) {
                 const matches = /filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/.exec(contentDisposition);
                 if (matches != null && matches[1]) {

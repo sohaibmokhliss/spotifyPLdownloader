@@ -645,3 +645,65 @@ footer {
         height: 100px;
     }
 }
+/* Format Selector */
+.format-selector {
+    margin-bottom: 20px;
+    text-align: center;
+}
+
+.format-selector > label {
+    display: block;
+    margin-bottom: 10px;
+    color: #333;
+    font-weight: 600;
+    font-size: 1em;
+}
+
+.format-options {
+    display: flex;
+    gap: 15px;
+    justify-content: center;
+    flex-wrap: wrap;
+}
+
+.format-option {
+    display: flex;
+    align-items: center;
+    padding: 12px 20px;
+    background: #f5f5f5;
+    border: 2px solid #ddd;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.3s;
+}
+
+.format-option:hover {
+    background: #e8f0fe;
+    border-color: #667eea;
+}
+
+.format-option input[type="radio"] {
+    margin-right: 8px;
+    cursor: pointer;
+}
+
+.format-option input[type="radio"]:checked + span {
+    color: #667eea;
+    font-weight: 600;
+}
+
+.format-option:has(input[type="radio"]:checked) {
+    background: #e8f0fe;
+    border-color: #667eea;
+}
+
+@media (max-width: 768px) {
+    .format-options {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .format-option {
+        justify-content: center;
+    }
+}

@@ -48,6 +48,21 @@
 
         <div class="input-section">
             <h3>🎬 Direct YouTube Download</h3>
+
+            <div class="format-selector">
+                <label>Format:</label>
+                <div class="format-options">
+                    <label class="format-option">
+                        <input type="radio" name="downloadFormat" value="mp3" checked>
+                        <span>🎵 MP3 (Audio Only)</span>
+                    </label>
+                    <label class="format-option">
+                        <input type="radio" name="downloadFormat" value="mp4">
+                        <span>🎬 MP4 (Video)</span>
+                    </label>
+                </div>
+            </div>
+
             <div class="input-group">
                 <input
                     type="text"
@@ -55,7 +70,7 @@
                     placeholder="Paste YouTube video URL here..."
                     autocomplete="off"
                 >
-                <button id="youtubeDownloadBtn" onclick="downloadYouTube()">Download MP3</button>
+                <button id="youtubeDownloadBtn" onclick="downloadYouTube()">Download</button>
             </div>
             <p class="hint">Example: https://www.youtube.com/watch?v=dQw4w9WgXcQ</p>
             <div id="youtubeStatus" class="youtube-status" style="display: none;"></div>
