@@ -382,19 +382,8 @@ footer {
     border: 1px solid #c62828;
 }
 
-.organize-btn {
-    background: #ff9800;
-    padding: 15px 40px;
-    font-size: 18px;
-}
 
-.organize-btn:hover {
-    background: #f57c00;
-}
 
-.organize-btn:disabled {
-    background: #ccc;
-}
 
 .youtube-status small {
     display: block;

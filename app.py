@@ -1,4 +1,5 @@
-from flask import Flask, render_template, request, jsonify, send_from_directory
+import database as db
+from flask import Flask, render_template, request, jsonify, send_from_directory, make_response
 import spotipy
 from spotipy.oauth2 import SpotifyClientCredentials
 import requests
@@ -13,6 +14,7 @@ import yt_dlp
 load_dotenv()
 
 app = Flask(__name__)
+app.secret_key = os.getenv('SECRET_KEY', os.urandom(24).hex())
 
 # Configuration
 SPOTIFY_CLIENT_ID = os.getenv('SPOTIFY_CLIENT_ID')
@@ -289,11 +291,21 @@ def download_playlist():
 
             if success:
                 download_progress['completed'].append(track_name)
+                # Log successful download
+                session_token = request.cookies.get('session_token')
+                session = db.get_session(session_token) if session_token else None
+                if session:
+                    db.log_download(session['user_id'], 'playlist', track_name, playlist_url, True, None, request.remote_addr)
             else:
                 download_progress['failed'].append({
                     'track': track_name,
                     'reason': 'Download failed'
                 })
+                # Log failed download
+                session_token = request.cookies.get('session_token')
+                session = db.get_session(session_token) if session_token else None
+                if session:
+                    db.log_download(session['user_id'], 'playlist', track_name, playlist_url, False, 'Download failed', request.remote_addr)
 
             # Small delay to avoid rate limits
             time.sleep(1)
@@ -370,6 +382,11 @@ def resume_download():
 @app.route('/api/youtube/download', methods=['POST'])
 def download_youtube_direct():
     """Download a single YouTube video directly to downloads folder or send to client"""
+    # Get current user
+    session_token = request.cookies.get("session_token")
+    session = db.get_session(session_token) if session_token else None
+    user_id = session["user_id"] if session else None
+    
     try:
         data = request.get_json()
         youtube_url = data.get('youtube_url')
@@ -417,6 +434,19 @@ def download_youtube_direct():
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             ydl.download([youtube_url])
 
+        # Log successful download
+        if user_id:
+            db.log_download(
+                user_id,
+                "youtube",
+                video_title,
+                youtube_url,
+                True,
+                None,
+                request.remote_addr
+            )
+            db.log_activity(user_id, "youtube_download", f"Downloaded: {video_title}", request.remote_addr, request.headers.get("User-Agent"))
+
         if download_to_device:
             # Send file to client
             mp3_file = f'{filepath}.mp3'
@@ -445,6 +475,11 @@ def download_youtube_direct():
             })
 
     except Exception as e:
+        # Log failed download
+        session_token = request.cookies.get("session_token")
+        session = db.get_session(session_token) if session_token else None
+        if session:
+            db.log_download(session["user_id"], "youtube", "unknown", youtube_url if "youtube_url" in locals() else None, False, str(e), request.remote_addr)
         return jsonify({'error': f'Download failed: {str(e)}'}), 500
 
 @app.route('/downloads/<path:filename>')
@@ -452,94 +487,157 @@ def download_file(filename):
     """Serve downloaded files"""
     return send_from_directory(DOWNLOAD_FOLDER, filename, as_attachment=True)
 
-@app.route('/api/create-all-songs', methods=['POST'])
-def create_all_songs_playlist():
-    """Scan downloads folder and create deduplicated all_songs folder or ZIP"""
-    try:
-        import shutil
-        from pathlib import Path
 
-        data = request.get_json()
-        download_to_device = data.get('download_to_device', False)
 
-        # Track unique songs by filename (without path)
-        unique_songs = {}
-        total_files = 0
-        duplicates = 0
+@app.route('/login')
+def login_page():
+    """Serve login page"""
+    return render_template('auth.html')
 
-        # Recursively scan downloads folder for .mp3 files
-        downloads_path = Path(DOWNLOAD_FOLDER)
 
-        for mp3_file in downloads_path.rglob('*.mp3'):
-            # Skip files already in all_songs folder
-            if 'all_songs' in str(mp3_file):
-                continue
+# Authentication endpoints
+@app.route('/api/auth/register', methods=['POST'])
+def register():
+    """Register a new user"""
+    data = request.get_json()
+    username = data.get('username')
+    password = data.get('password')
+    email = data.get('email')
 
-            total_files += 1
-            filename = mp3_file.name
+    if not username or not password:
+        return jsonify({'error': 'Username and password are required'}), 400
 
-            # Check if we've seen this filename before
-            if filename not in unique_songs:
-                unique_songs[filename] = str(mp3_file)
-            else:
-                duplicates += 1
+    if len(password) < 6:
+        return jsonify({'error': 'Password must be at least 6 characters'}), 400
 
-        if download_to_device:
-            # Create ZIP file with all unique songs and send to client
-            import zipfile
-            import tempfile
+    user_id = db.create_user(username, password, email)
 
-            zip_path = os.path.join(tempfile.gettempdir(), 'all_songs.zip')
+    if not user_id:
+        return jsonify({'error': 'Username already exists'}), 400
 
-            with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED) as zipf:
-                for filename, source_path in unique_songs.items():
-                    zipf.write(source_path, filename)
+    # Log activity
+    ip_address = request.remote_addr
+    user_agent = request.headers.get('User-Agent')
+    db.log_activity(user_id, 'register', f'New user registered: {username}', ip_address, user_agent)
 
-            response = send_from_directory(
-                os.path.dirname(zip_path),
-                os.path.basename(zip_path),
-                as_attachment=True,
-                download_name='all_songs.zip'
-            )
+    return jsonify({'success': True, 'message': 'User registered successfully'})
 
-            # Clean up temp file after sending
-            @response.call_on_close
-            def cleanup():
-                try:
-                    os.remove(zip_path)
-                except:
-                    pass
+@app.route('/api/auth/login', methods=['POST'])
+def login():
+    """Login user"""
+    data = request.get_json()
+    username = data.get('username')
+    password = data.get('password')
 
-            return response
-        else:
-            # Create all_songs folder on server
-            all_songs_folder = os.path.join(DOWNLOAD_FOLDER, 'all_songs')
-            os.makedirs(all_songs_folder, exist_ok=True)
+    if not username or not password:
+        return jsonify({'error': 'Username and password are required'}), 400
 
-            # Copy unique files to all_songs folder
-            copied = 0
-            for filename, source_path in unique_songs.items():
-                dest_path = os.path.join(all_songs_folder, filename)
+    user = db.verify_user(username, password)
 
-                # Only copy if destination doesn't exist
-                if not os.path.exists(dest_path):
-                    shutil.copy2(source_path, dest_path)
-                    copied += 1
+    if not user:
+        return jsonify({'error': 'Invalid username or password'}), 401
 
-            return jsonify({
-                'success': True,
-                'message': f'Created all_songs folder with {len(unique_songs)} unique tracks',
-                'stats': {
-                    'total_files_scanned': total_files,
-                    'unique_tracks': len(unique_songs),
-                    'duplicates_found': duplicates,
-                    'files_copied': copied
-                }
-            })
+    # Create session
+    ip_address = request.remote_addr
+    user_agent = request.headers.get('User-Agent')
+    session_token = db.create_session(user['id'], ip_address, user_agent)
 
-    except Exception as e:
-        return jsonify({'error': f'Failed to create all_songs folder: {str(e)}'}), 500
+    # Log activity
+    db.log_activity(user['id'], 'login', f'User logged in', ip_address, user_agent)
 
+    # Create response with cookie
+    response = make_response(jsonify({
+        'success': True,
+        'user': {
+            'id': user['id'],
+            'username': user['username'],
+            'is_admin': bool(user['is_admin'])
+        }
+    }))
+
+    response.set_cookie('session_token', session_token, max_age=7*24*60*60, httponly=True, samesite='Lax')
+
+    return response
+
+@app.route('/api/auth/logout', methods=['POST'])
+def logout():
+    """Logout user"""
+    session_token = request.cookies.get('session_token')
+
+    if session_token:
+        session = db.get_session(session_token)
+        if session:
+            db.log_activity(session['user_id'], 'logout', 'User logged out', request.remote_addr, request.headers.get('User-Agent'))
+            db.delete_session(session_token)
+
+    response = make_response(jsonify({'success': True}))
+    response.set_cookie('session_token', '', expires=0)
+
+    return response
+
+@app.route('/api/auth/me', methods=['GET'])
+def get_current_user():
+    """Get current logged in user"""
+    session_token = request.cookies.get('session_token')
+
+    if not session_token:
+        return jsonify({'authenticated': False}), 200
+
+    session = db.get_session(session_token)
+
+    if not session:
+        return jsonify({'authenticated': False}), 200
+
+    return jsonify({
+        'authenticated': True,
+        'user': {
+            'id': session['user_id'],
+            'username': session['username'],
+            'is_admin': bool(session['is_admin'])
+        }
+    })
+
+@app.route('/admin')
+def admin_page():
+    """Serve admin dashboard"""
+    session_token = request.cookies.get('session_token')
+    session = db.get_session(session_token)
+
+    if not session or not session['is_admin']:
+        return render_template('auth.html')
+
+    return render_template('admin.html')
+
+# Admin API endpoints
+@app.route('/api/admin/stats', methods=['GET'])
+@db.require_admin
+def get_admin_stats():
+    """Get overall system statistics"""
+    stats = db.get_stats()
+    return jsonify(stats)
+
+@app.route('/api/admin/users', methods=['GET'])
+@db.require_admin
+def get_admin_users():
+    """Get all users"""
+    users = db.get_all_users()
+    return jsonify({'users': users})
+
+@app.route('/api/admin/activity', methods=['GET'])
+@db.require_admin
+def get_admin_activity():
+    """Get recent activity"""
+    limit = request.args.get('limit', 100, type=int)
+    activities = db.get_recent_activity(limit)
+    return jsonify({'activities': activities})
+
+@app.route('/api/admin/downloads', methods=['GET'])
+@db.require_admin
+def get_admin_downloads():
+    """Get download history"""
+    limit = request.args.get('limit', 100, type=int)
+    downloads = db.get_download_history(limit)
+    return jsonify({'downloads': downloads})
 if __name__ == '__main__':
     port = int(os.getenv('FLASK_PORT', 5000))
     app.run(debug=True, host='0.0.0.0', port=port)

@@ -1,0 +1,304 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login - Spotify Playlist Downloader</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <style>
+        .auth-container {
+            max-width: 450px;
+            margin: 50px auto;
+        }
+
+        .auth-tabs {
+            display: flex;
+            margin-bottom: 20px;
+            border-bottom: 2px solid #ddd;
+        }
+
+        .auth-tab {
+            flex: 1;
+            padding: 15px;
+            background: none;
+            border: none;
+            border-bottom: 3px solid transparent;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: 600;
+            color: #666;
+            transition: all 0.3s;
+        }
+
+        .auth-tab.active {
+            color: #667eea;
+            border-bottom-color: #667eea;
+        }
+
+        .auth-form {
+            display: none;
+        }
+
+        .auth-form.active {
+            display: block;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            color: #333;
+            font-weight: 600;
+        }
+
+        .form-group input {
+            width: 100%;
+            padding: 12px 15px;
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            font-size: 16px;
+            transition: border-color 0.3s;
+        }
+
+        .form-group input:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .auth-button {
+            width: 100%;
+            padding: 14px;
+            background: #667eea;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+
+        .auth-button:hover {
+            background: #5568d3;
+        }
+
+        .auth-button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+
+        .error-message {
+            margin-top: 15px;
+            padding: 12px;
+            background: #fee;
+            border-left: 4px solid #e74c3c;
+            border-radius: 5px;
+            color: #c0392b;
+            display: none;
+        }
+
+        .success-message {
+            margin-top: 15px;
+            padding: 12px;
+            background: #e8f5e9;
+            border-left: 4px solid #1db954;
+            border-radius: 5px;
+            color: #2e7d32;
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="container auth-container">
+        <header>
+            <h1>🎵 Spotify Playlist Downloader</h1>
+            <p>Sign in to start downloading</p>
+        </header>
+
+        <div class="auth-tabs">
+            <button class="auth-tab active" onclick="switchTab('login')">Login</button>
+            <button class="auth-tab" onclick="switchTab('register')">Register</button>
+        </div>
+
+        <!-- Login Form -->
+        <form id="loginForm" class="auth-form active" onsubmit="handleLogin(event)">
+            <div class="form-group">
+                <label for="loginUsername">Username</label>
+                <input type="text" id="loginUsername" required autocomplete="username">
+            </div>
+
+            <div class="form-group">
+                <label for="loginPassword">Password</label>
+                <input type="password" id="loginPassword" required autocomplete="current-password">
+            </div>
+
+            <button type="submit" class="auth-button" id="loginButton">Login</button>
+
+            <div id="loginError" class="error-message"></div>
+        </form>
+
+        <!-- Register Form -->
+        <form id="registerForm" class="auth-form" onsubmit="handleRegister(event)">
+            <div class="form-group">
+                <label for="registerUsername">Username</label>
+                <input type="text" id="registerUsername" required autocomplete="username">
+            </div>
+
+            <div class="form-group">
+                <label for="registerEmail">Email (optional)</label>
+                <input type="email" id="registerEmail" autocomplete="email">
+            </div>
+
+            <div class="form-group">
+                <label for="registerPassword">Password (min 6 characters)</label>
+                <input type="password" id="registerPassword" required minlength="6" autocomplete="new-password">
+            </div>
+
+            <div class="form-group">
+                <label for="registerPasswordConfirm">Confirm Password</label>
+                <input type="password" id="registerPasswordConfirm" required autocomplete="new-password">
+            </div>
+
+            <button type="submit" class="auth-button" id="registerButton">Register</button>
+
+            <div id="registerError" class="error-message"></div>
+            <div id="registerSuccess" class="success-message"></div>
+        </form>
+    </div>
+
+    <script>
+        function switchTab(tab) {
+            // Update tabs
+            document.querySelectorAll('.auth-tab').forEach(t => t.classList.remove('active'));
+            event.target.classList.add('active');
+
+            // Update forms
+            document.querySelectorAll('.auth-form').forEach(f => f.classList.remove('active'));
+            document.getElementById(tab + 'Form').classList.add('active');
+
+            // Clear messages
+            document.getElementById('loginError').style.display = 'none';
+            document.getElementById('registerError').style.display = 'none';
+            document.getElementById('registerSuccess').style.display = 'none';
+        }
+
+        async function handleLogin(event) {
+            event.preventDefault();
+
+            const username = document.getElementById('loginUsername').value;
+            const password = document.getElementById('loginPassword').value;
+            const button = document.getElementById('loginButton');
+            const errorDiv = document.getElementById('loginError');
+
+            button.disabled = true;
+            button.textContent = 'Logging in...';
+            errorDiv.style.display = 'none';
+
+            try {
+                const response = await fetch('/api/auth/login', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ username, password })
+                });
+
+                const data = await response.json();
+
+                if (!response.ok) {
+                    throw new Error(data.error || 'Login failed');
+                }
+
+                // Redirect to main page
+                window.location.href = '/';
+
+            } catch (error) {
+                errorDiv.textContent = error.message;
+                errorDiv.style.display = 'block';
+            } finally {
+                button.disabled = false;
+                button.textContent = 'Login';
+            }
+        }
+
+        async function handleRegister(event) {
+            event.preventDefault();
+
+            const username = document.getElementById('registerUsername').value;
+            const email = document.getElementById('registerEmail').value;
+            const password = document.getElementById('registerPassword').value;
+            const passwordConfirm = document.getElementById('registerPasswordConfirm').value;
+            const button = document.getElementById('registerButton');
+            const errorDiv = document.getElementById('registerError');
+            const successDiv = document.getElementById('registerSuccess');
+
+            errorDiv.style.display = 'none';
+            successDiv.style.display = 'none';
+
+            if (password !== passwordConfirm) {
+                errorDiv.textContent = 'Passwords do not match';
+                errorDiv.style.display = 'block';
+                return;
+            }
+
+            button.disabled = true;
+            button.textContent = 'Creating account...';
+
+            try {
+                const response = await fetch('/api/auth/register', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ username, email, password })
+                });
+
+                const data = await response.json();
+
+                if (!response.ok) {
+                    throw new Error(data.error || 'Registration failed');
+                }
+
+                // Show success message
+                successDiv.textContent = 'Account created! Switching to login...';
+                successDiv.style.display = 'block';
+
+                // Clear form
+                document.getElementById('registerForm').reset();
+
+                // Switch to login tab after 1.5 seconds
+                setTimeout(() => {
+                    document.querySelectorAll('.auth-tab')[0].click();
+                    document.getElementById('loginUsername').value = username;
+                }, 1500);
+
+            } catch (error) {
+                errorDiv.textContent = error.message;
+                errorDiv.style.display = 'block';
+            } finally {
+                button.disabled = false;
+                button.textContent = 'Register';
+            }
+        }
+
+        // Check if already logged in
+        async function checkAuth() {
+            try {
+                const response = await fetch('/api/auth/me');
+                const data = await response.json();
+
+                if (data.authenticated) {
+                    window.location.href = '/';
+                }
+            } catch (error) {
+                // Not logged in, stay on login page
+            }
+        }
+
+        checkAuth();
+    </script>
+</body>
+</html>
