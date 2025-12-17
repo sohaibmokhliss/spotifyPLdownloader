@@ -423,8 +423,182 @@ async function handleLogout() {
     }
 }
 
+// YouTube Playlist Functions
+async function fetchYoutubePlaylist() {
+    const playlistUrl = document.getElementById('youtubePlaylistUrl').value.trim();
+
+    if (!playlistUrl) {
+        showError('Please enter a YouTube playlist URL');
+        return;
+    }
+
+    const fetchBtn = document.getElementById('fetchYoutubePlaylistBtn');
+    fetchBtn.disabled = true;
+    fetchBtn.textContent = 'Fetching...';
+
+    try {
+        const response = await fetch('/api/youtube/playlist/info', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ playlist_url: playlistUrl })
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+            throw new Error(data.error || 'Failed to fetch playlist');
+        }
+
+        displayYoutubePlaylistInfo(data.playlist);
+
+    } catch (error) {
+        showError(error.message);
+    } finally {
+        fetchBtn.disabled = false;
+        fetchBtn.textContent = 'Fetch Playlist';
+    }
+}
+
+function displayYoutubePlaylistInfo(playlist) {
+    const infoDiv = document.getElementById('youtubePlaylistInfo');
+
+    document.getElementById('youtubePlaylistName').textContent = playlist.name;
+    document.getElementById('youtubePlaylistDescription').textContent = playlist.description || 'No description';
+    document.getElementById('youtubeVideoCount').textContent = `${playlist.video_count} videos`;
+
+    if (playlist.thumbnail) {
+        document.getElementById('youtubePlaylistImage').src = playlist.thumbnail;
+    }
+
+    const videoListDiv = document.getElementById('youtubeVideoList');
+    videoListDiv.innerHTML = '';
+
+    playlist.videos.forEach((video, index) => {
+        const videoDiv = document.createElement('div');
+        videoDiv.className = 'track-item';
+        videoDiv.innerHTML = `
+            <div class="track-info">
+                <div class="track-name">${index + 1}. ${video.title}</div>
+                <div class="track-artist">${video.channel}</div>
+            </div>
+        `;
+        videoListDiv.appendChild(videoDiv);
+    });
+
+    infoDiv.style.display = 'block';
+    infoDiv.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
+async function downloadYoutubePlaylist(resume = false) {
+    const playlistUrl = document.getElementById('youtubePlaylistUrl').value.trim();
+    const format = document.querySelector('input[name="youtubePlaylistFormat"]:checked').value;
+
+    const downloadBtn = document.getElementById('downloadYoutubePlaylistBtn');
+    const stopBtn = document.getElementById('stopYoutubePlaylistBtn');
+    const resumeBtn = document.getElementById('resumeYoutubePlaylistBtn');
+
+    downloadBtn.disabled = true;
+    downloadBtn.textContent = 'Downloading...';
+    stopBtn.style.display = 'inline-block';
+    resumeBtn.style.display = 'none';
+
+    const progressSection = document.getElementById('progressSection');
+    progressSection.style.display = 'block';
+
+    if (!resume) {
+        document.getElementById('progressBar').style.width = '0%';
+        document.getElementById('completedList').innerHTML = '';
+        document.getElementById('failedList').innerHTML = '';
+        document.getElementById('completedCount').textContent = '0';
+        document.getElementById('failedCount').textContent = '0';
+    }
+
+    startProgressPolling();
+
+    try {
+        const response = await fetch('/api/youtube/playlist/download', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                playlist_url: playlistUrl,
+                resume: resume,
+                download_to_device: downloadLocation === 'device',
+                format: format
+            })
+        });
+
+        if (downloadLocation === 'device') {
+            // For device download, expect a ZIP file after completion
+            const blob = await response.blob();
+            if (!response.ok) {
+                const text = await blob.text();
+                const data = JSON.parse(text);
+                throw new Error(data.error || 'Download failed');
+            }
+
+            // Download the ZIP file
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'youtube_playlist.zip';
+            document.body.appendChild(a);
+            a.click();
+            window.URL.revokeObjectURL(url);
+            document.body.removeChild(a);
+
+            alert('YouTube playlist ZIP file downloaded to your device!');
+            stopBtn.style.display = 'none';
+            resumeBtn.style.display = 'none';
+        } else {
+            const data = await response.json();
+
+            if (!response.ok) {
+                throw new Error(data.error || 'Download failed');
+            }
+
+            updateProgress();
+
+            if (data.paused) {
+                stopBtn.style.display = 'none';
+                resumeBtn.style.display = 'inline-block';
+                downloadBtn.disabled = false;
+                downloadBtn.textContent = '📥 Download All';
+            } else {
+                alert(`Download complete! ${data.completed} videos downloaded successfully.`);
+                stopBtn.style.display = 'none';
+                resumeBtn.style.display = 'none';
+            }
+        }
+
+    } catch (error) {
+        showError(error.message);
+    } finally {
+        stopProgressPolling();
+        downloadBtn.disabled = false;
+        downloadBtn.textContent = '📥 Download All';
+    }
+}
+
+async function resumeYoutubePlaylist() {
+    downloadYoutubePlaylist(true);
+}
+
 // Load configuration and user when page loads
 document.addEventListener('DOMContentLoaded', () => {
     loadConfig();
     loadCurrentUser();
+
+    // Event listener for YouTube playlist URL
+    const youtubePlaylistInput = document.getElementById('youtubePlaylistUrl');
+    if (youtubePlaylistInput) {
+        youtubePlaylistInput.addEventListener('keypress', function(event) {
+            if (event.key === 'Enter') {
+                fetchYoutubePlaylist();
+            }
+        });
+    }
 });
