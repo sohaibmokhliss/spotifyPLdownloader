@@ -159,24 +159,35 @@ def search_youtube_video(song_name, artist):
         print(f"YouTube search error: {e}")
         return None
 
-def download_mp3_from_youtube(youtube_url, artist, track_name, download_folder=DOWNLOAD_FOLDER):
-    """Download MP3 using yt-dlp"""
+def download_from_youtube(youtube_url, artist, track_name, download_folder=DOWNLOAD_FOLDER, format_type='mp3'):
+    """Download MP3 or MP4 using yt-dlp"""
     try:
         filename = sanitize_filename(f"{artist} - {track_name}")
         filepath = os.path.join(download_folder, filename)
 
-        # yt-dlp options
-        ydl_opts = {
-            'format': 'bestaudio/best',
-            'postprocessors': [{
-                'key': 'FFmpegExtractAudio',
-                'preferredcodec': 'mp3',
-                'preferredquality': '192',
-            }],
-            'outtmpl': filepath,
-            'quiet': True,
-            'no_warnings': True,
-        }
+        # Configure yt-dlp options based on format
+        if format_type == 'mp4':
+            # Download video (MP4)
+            ydl_opts = {
+                'format': 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best',
+                'outtmpl': filepath,
+                'quiet': True,
+                'no_warnings': True,
+                'merge_output_format': 'mp4',
+            }
+        else:
+            # Download audio only (MP3)
+            ydl_opts = {
+                'format': 'bestaudio/best',
+                'postprocessors': [{
+                    'key': 'FFmpegExtractAudio',
+                    'preferredcodec': 'mp3',
+                    'preferredquality': '192',
+                }],
+                'outtmpl': filepath,
+                'quiet': True,
+                'no_warnings': True,
+            }
 
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             ydl.download([youtube_url])
@@ -197,6 +208,7 @@ def download_playlist():
         playlist_url = data.get('playlist_url')
         resume = data.get('resume', False)
         download_to_device = data.get('download_to_device', False)
+        format_type = data.get('format', 'mp3')  # Default to mp3
 
         if not playlist_url:
             return jsonify({'error': 'Playlist URL is required'}), 400
@@ -286,8 +298,8 @@ def download_playlist():
                 })
                 continue
 
-            # Download MP3 to playlist folder
-            success = download_mp3_from_youtube(youtube_url, track['artist'], track['name'], playlist_folder)
+            # Download from YouTube to playlist folder
+            success = download_from_youtube(youtube_url, track['artist'], track['name'], playlist_folder, format_type)
 
             if success:
                 download_progress['completed'].append(track_name)
@@ -320,10 +332,11 @@ def download_playlist():
 
             zip_path = os.path.join(tempfile.gettempdir(), f'{playlist_name}.zip')
 
+            file_extension = '.mp4' if format_type == 'mp4' else '.mp3'
             with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED) as zipf:
                 for root, dirs, files in os.walk(playlist_folder):
                     for file in files:
-                        if file.endswith('.mp3'):
+                        if file.endswith(file_extension):
                             file_path = os.path.join(root, file)
                             zipf.write(file_path, file)
 

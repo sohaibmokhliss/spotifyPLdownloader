@@ -82,6 +82,7 @@ function displayPlaylistInfo(playlist) {
 
 async function downloadPlaylist(resume = false) {
     const playlistUrl = document.getElementById('playlistUrl').value.trim();
+    const format = document.querySelector('input[name="playlistFormat"]:checked').value;
 
     const downloadBtn = document.getElementById('downloadBtn');
     const stopBtn = document.getElementById('stopBtn');
@@ -114,7 +115,8 @@ async function downloadPlaylist(resume = false) {
             body: JSON.stringify({
                 playlist_url: playlistUrl,
                 resume: resume,
-                download_to_device: downloadLocation === 'device'
+                download_to_device: downloadLocation === 'device',
+                format: format
             })
         });
 
