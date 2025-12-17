@@ -391,6 +391,7 @@ def download_youtube_direct():
         data = request.get_json()
         youtube_url = data.get('youtube_url')
         download_to_device = data.get('download_to_device', False)
+        format_type = data.get('format', 'mp3')  # Default to mp3
 
         if not youtube_url:
             return jsonify({'error': 'YouTube URL is required'}), 400
@@ -419,17 +420,29 @@ def download_youtube_direct():
             # Download directly to downloads folder
             filepath = os.path.join(DOWNLOAD_FOLDER, video_title)
 
-        ydl_opts = {
-            'format': 'bestaudio/best',
-            'postprocessors': [{
-                'key': 'FFmpegExtractAudio',
-                'preferredcodec': 'mp3',
-                'preferredquality': '192',
-            }],
-            'outtmpl': filepath,
-            'quiet': True,
-            'no_warnings': True,
-        }
+        # Configure yt-dlp options based on format
+        if format_type == 'mp4':
+            # Download video (MP4)
+            ydl_opts = {
+                'format': 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best',
+                'outtmpl': filepath,
+                'quiet': True,
+                'no_warnings': True,
+                'merge_output_format': 'mp4',
+            }
+        else:
+            # Download audio only (MP3)
+            ydl_opts = {
+                'format': 'bestaudio/best',
+                'postprocessors': [{
+                    'key': 'FFmpegExtractAudio',
+                    'preferredcodec': 'mp3',
+                    'preferredquality': '192',
+                }],
+                'outtmpl': filepath,
+                'quiet': True,
+                'no_warnings': True,
+            }
 
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             ydl.download([youtube_url])
@@ -449,12 +462,13 @@ def download_youtube_direct():
 
         if download_to_device:
             # Send file to client
-            mp3_file = f'{filepath}.mp3'
+            file_extension = '.mp4' if format_type == 'mp4' else '.mp3'
+            downloaded_file = f'{filepath}{file_extension}'
             response = send_from_directory(
                 temp_dir,
-                f'{video_title}.mp3',
+                f'{video_title}{file_extension}',
                 as_attachment=True,
-                download_name=f'{video_title}.mp3'
+                download_name=f'{video_title}{file_extension}'
             )
 
             # Clean up temp file after sending
@@ -468,10 +482,11 @@ def download_youtube_direct():
 
             return response
         else:
+            file_extension = '.mp4' if format_type == 'mp4' else '.mp3'
             return jsonify({
                 'success': True,
                 'message': f'Successfully downloaded: {video_title}',
-                'filename': f'{video_title}.mp3'
+                'filename': f'{video_title}{file_extension}'
             })
 
     except Exception as e:
