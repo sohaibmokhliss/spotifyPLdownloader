@@ -91,6 +91,64 @@
             <div id="youtubeStatus" class="youtube-status" style="display: none;"></div>
         </div>
 
+        <div class="divider">
+            <span>OR</span>
+        </div>
+
+        <div class="input-section">
+            <h3>📺 YouTube Playlist Download</h3>
+
+            <div class="format-selector">
+                <label>Format:</label>
+                <div class="format-options">
+                    <label class="format-option">
+                        <input type="radio" name="youtubePlaylistFormat" value="mp3" checked>
+                        <span>🎵 MP3 (Audio Only)</span>
+                    </label>
+                    <label class="format-option">
+                        <input type="radio" name="youtubePlaylistFormat" value="mp4">
+                        <span>🎬 MP4 (Video)</span>
+                    </label>
+                </div>
+            </div>
+
+            <div class="input-group">
+                <input
+                    type="text"
+                    id="youtubePlaylistUrl"
+                    placeholder="Paste YouTube playlist URL here..."
+                    autocomplete="off"
+                >
+                <button id="fetchYoutubePlaylistBtn" onclick="fetchYoutubePlaylist()">Fetch Playlist</button>
+            </div>
+            <p class="hint">Example: https://www.youtube.com/playlist?list=PLx0sYbCqOb8TBPRdmBHs5Iftvv9TPboYG</p>
+        </div>
+
+        <div id="youtubePlaylistInfo" class="playlist-info" style="display: none;">
+            <div class="playlist-header">
+                <img id="youtubePlaylistImage" src="" alt="Playlist thumbnail">
+                <div class="playlist-details">
+                    <h2 id="youtubePlaylistName"></h2>
+                    <p id="youtubePlaylistDescription"></p>
+                    <p class="track-count" id="youtubeVideoCount"></p>
+                </div>
+            </div>
+
+            <div class="action-buttons">
+                <button id="downloadYoutubePlaylistBtn" onclick="downloadYoutubePlaylist()" class="download-btn">
+                    📥 Download All
+                </button>
+                <button id="stopYoutubePlaylistBtn" onclick="stopDownload()" class="stop-btn" style="display: none;">
+                    ⏸️ Stop Download
+                </button>
+                <button id="resumeYoutubePlaylistBtn" onclick="resumeYoutubePlaylist()" class="resume-btn" style="display: none;">
+                    ▶️ Resume Download
+                </button>
+            </div>
+
+            <div id="youtubeVideoList" class="track-list"></div>
+        </div>
+
         <div id="playlistInfo" class="playlist-info" style="display: none;">
             <div class="playlist-header">
                 <img id="playlistImage" src="" alt="Playlist cover">

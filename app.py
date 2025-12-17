@@ -515,6 +515,249 @@ def download_file(filename):
     """Serve downloaded files"""
     return send_from_directory(DOWNLOAD_FOLDER, filename, as_attachment=True)
 
+@app.route('/api/youtube/playlist/info', methods=['POST'])
+def get_youtube_playlist_info():
+    """Get YouTube playlist metadata"""
+    try:
+        data = request.get_json()
+        playlist_url = data.get('playlist_url')
+
+        if not playlist_url:
+            return jsonify({'error': 'Playlist URL is required'}), 400
+
+        # Validate YouTube playlist URL
+        if 'youtube.com/playlist' not in playlist_url and 'youtu.be' not in playlist_url:
+            return jsonify({'error': 'Invalid YouTube playlist URL'}), 400
+
+        # Extract playlist info using yt-dlp
+        ydl_opts = {
+            'quiet': True,
+            'no_warnings': True,
+            'extract_flat': True,  # Don't download, just extract info
+        }
+
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            playlist_info = ydl.extract_info(playlist_url, download=False)
+
+            if not playlist_info:
+                return jsonify({'error': 'Failed to fetch playlist information'}), 500
+
+            videos = []
+            for entry in playlist_info.get('entries', []):
+                if entry:
+                    videos.append({
+                        'title': entry.get('title', 'Unknown'),
+                        'channel': entry.get('uploader', 'Unknown'),
+                        'url': entry.get('url', '')
+                    })
+
+            return jsonify({
+                'success': True,
+                'playlist': {
+                    'name': playlist_info.get('title', 'Unknown Playlist'),
+                    'description': playlist_info.get('description', ''),
+                    'video_count': len(videos),
+                    'thumbnail': playlist_info.get('thumbnail', ''),
+                    'videos': videos
+                }
+            })
+
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/youtube/playlist/download', methods=['POST'])
+def download_youtube_playlist():
+    """Download entire YouTube playlist"""
+    global download_progress
+
+    # Get current user
+    session_token = request.cookies.get("session_token")
+    session = db.get_session(session_token) if session_token else None
+    user_id = session["user_id"] if session else None
+
+    try:
+        data = request.get_json()
+        playlist_url = data.get('playlist_url')
+        resume = data.get('resume', False)
+        download_to_device = data.get('download_to_device', False)
+        format_type = data.get('format', 'mp3')
+
+        if not playlist_url:
+            return jsonify({'error': 'Playlist URL is required'}), 400
+
+        # Validate YouTube playlist URL
+        if 'youtube.com/playlist' not in playlist_url and 'youtu.be' not in playlist_url:
+            return jsonify({'error': 'Invalid YouTube playlist URL'}), 400
+
+        # Extract playlist info
+        ydl_opts_info = {
+            'quiet': True,
+            'no_warnings': True,
+            'extract_flat': True,
+        }
+
+        with yt_dlp.YoutubeDL(ydl_opts_info) as ydl:
+            playlist_info = ydl.extract_info(playlist_url, download=False)
+            playlist_name = sanitize_filename(playlist_info.get('title', 'youtube_playlist'))
+            entries = playlist_info.get('entries', [])
+
+        # Choose download location
+        if download_to_device:
+            import tempfile
+            playlist_folder = tempfile.mkdtemp()
+        else:
+            playlist_folder = os.path.join(DOWNLOAD_FOLDER, playlist_name)
+            os.makedirs(playlist_folder, exist_ok=True)
+
+        # Prepare video list
+        videos_info = []
+        for entry in entries:
+            if entry:
+                videos_info.append({
+                    'title': entry.get('title', 'Unknown'),
+                    'url': f"https://www.youtube.com/watch?v={entry.get('id', '')}"
+                })
+
+        # If not resuming, reset progress
+        if not resume:
+            download_progress = {
+                'current': 0,
+                'total': len(videos_info),
+                'current_track': '',
+                'status': 'downloading',
+                'completed': [],
+                'failed': [],
+                'should_stop': False,
+                'playlist_name': playlist_name,
+                'playlist_url': playlist_url,
+                'tracks_info': videos_info
+            }
+        else:
+            download_progress['should_stop'] = False
+            download_progress['status'] = 'downloading'
+
+        # Download each video
+        start_index = download_progress['current'] if resume else 0
+
+        for idx in range(start_index, len(videos_info)):
+            # Check if should stop
+            if download_progress['should_stop']:
+                download_progress['status'] = 'paused'
+                return jsonify({
+                    'success': True,
+                    'message': 'Download paused',
+                    'completed': len(download_progress['completed']),
+                    'failed': len(download_progress['failed']),
+                    'paused': True
+                })
+
+            video = videos_info[idx]
+            download_progress['current'] = idx + 1
+            download_progress['current_track'] = video['title']
+
+            # Check if already downloaded
+            if video['title'] in download_progress['completed']:
+                continue
+
+            try:
+                # Download video
+                filename = sanitize_filename(video['title'])
+                filepath = os.path.join(playlist_folder, filename)
+
+                # Configure yt-dlp options based on format
+                if format_type == 'mp4':
+                    ydl_opts = {
+                        'format': 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best',
+                        'outtmpl': filepath,
+                        'quiet': True,
+                        'no_warnings': True,
+                        'merge_output_format': 'mp4',
+                    }
+                else:
+                    ydl_opts = {
+                        'format': 'bestaudio/best',
+                        'postprocessors': [{
+                            'key': 'FFmpegExtractAudio',
+                            'preferredcodec': 'mp3',
+                            'preferredquality': '192',
+                        }],
+                        'outtmpl': filepath,
+                        'quiet': True,
+                        'no_warnings': True,
+                    }
+
+                with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                    ydl.download([video['url']])
+
+                download_progress['completed'].append(video['title'])
+
+                # Log successful download
+                if user_id:
+                    db.log_download(user_id, 'youtube_playlist', video['title'], playlist_url, True, None, request.remote_addr)
+
+            except Exception as e:
+                download_progress['failed'].append({
+                    'track': video['title'],
+                    'reason': str(e)
+                })
+
+                # Log failed download
+                if user_id:
+                    db.log_download(user_id, 'youtube_playlist', video['title'], playlist_url, False, str(e), request.remote_addr)
+
+            # Small delay to avoid rate limits
+            time.sleep(1)
+
+        download_progress['status'] = 'completed'
+
+        # Log activity
+        if user_id:
+            db.log_activity(user_id, "youtube_playlist_download", f"Downloaded playlist: {playlist_name}", request.remote_addr, request.headers.get("User-Agent"))
+
+        if download_to_device:
+            # Create ZIP file and send to client
+            import zipfile
+            import shutil
+
+            zip_path = os.path.join(tempfile.gettempdir(), f'{playlist_name}.zip')
+
+            file_extension = '.mp4' if format_type == 'mp4' else '.mp3'
+            with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED) as zipf:
+                for root, dirs, files in os.walk(playlist_folder):
+                    for file in files:
+                        if file.endswith(file_extension):
+                            file_path = os.path.join(root, file)
+                            zipf.write(file_path, file)
+
+            response = send_from_directory(
+                os.path.dirname(zip_path),
+                os.path.basename(zip_path),
+                as_attachment=True,
+                download_name=f'{playlist_name}.zip'
+            )
+
+            # Clean up temp files after sending
+            @response.call_on_close
+            def cleanup():
+                try:
+                    shutil.rmtree(playlist_folder)
+                    os.remove(zip_path)
+                except:
+                    pass
+
+            return response
+        else:
+            return jsonify({
+                'success': True,
+                'message': f"Downloaded {len(download_progress['completed'])} of {download_progress['total']} videos",
+                'completed': len(download_progress['completed']),
+                'failed': len(download_progress['failed'])
+            })
+
+    except Exception as e:
+        download_progress['status'] = 'error'
+        return jsonify({'error': str(e)}), 500
+
 
 
 @app.route('/login')
