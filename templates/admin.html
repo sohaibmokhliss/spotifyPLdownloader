@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Activity Dashboard</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <div class="page-shell admin-shell">
+        <header class="page-header surface-card">
+            <div>
+                <span class="eyebrow">IP-Based Logs</span>
+                <h1>Activity Dashboard</h1>
+                <p>Review request activity and download history without user accounts or sessions.</p>
+            </div>
+            <a href="/" class="secondary-link">Back to Downloader</a>
+        </header>
+
+        <section id="statsGrid" class="stats-grid">
+            <div class="surface-card loading-state">Loading statistics...</div>
+        </section>
+
+        <section class="surface-card admin-panel">
+            <div class="tabs" role="tablist">
+                <button class="tab active" data-tab="activity" type="button">Activity</button>
+                <button class="tab" data-tab="downloads" type="button">Download History</button>
+            </div>
+
+            <div id="activity" class="tab-content active">
+                <div id="activityTable" class="table-wrap loading-state">Loading activity...</div>
+            </div>
+
+            <div id="downloads" class="tab-content" hidden>
+                <div id="downloadsTable" class="table-wrap loading-state">Loading downloads...</div>
+            </div>
+        </section>
+    </div>
+
+    <script>
+        function escapeHtml(value) {
+            return String(value ?? '')
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#39;');
+        }
+
+        function switchTab(tabName) {
+            document.querySelectorAll('.tab').forEach((tab) => {
+                tab.classList.toggle('active', tab.dataset.tab === tabName);
+            });
+
+            document.querySelectorAll('.tab-content').forEach((section) => {
+                const isActive = section.id === tabName;
+                section.classList.toggle('active', isActive);
+                section.hidden = !isActive;
+            });
+        }
+
+        async function loadStats() {
+            try {
+                const response = await fetch('/api/admin/stats');
+                const stats = await response.json();
+
+                document.getElementById('statsGrid').innerHTML = `
+                    <div class="stat-card surface-card">
+                        <span class="stat-label">Successful Downloads</span>
+                        <strong class="stat-value">${stats.total_downloads || 0}</strong>
+                    </div>
+                    <div class="stat-card surface-card">
+                        <span class="stat-label">Failed Downloads</span>
+                        <strong class="stat-value">${stats.failed_downloads || 0}</strong>
+                    </div>
+                    <div class="stat-card surface-card">
+                        <span class="stat-label">Activity (24h)</span>
+                        <strong class="stat-value">${stats.activity_last_24h || 0}</strong>
+                    </div>
+                    <div class="stat-card surface-card">
+                        <span class="stat-label">Unique IPs</span>
+                        <strong class="stat-value">${stats.unique_ips || 0}</strong>
+                    </div>
+                `;
+            } catch (error) {
+                console.error('Failed to load stats:', error);
+                document.getElementById('statsGrid').innerHTML = '<div class="surface-card loading-state">Failed to load statistics.</div>';
+            }
+        }
+
+        async function loadActivity() {
+            try {
+                const response = await fetch('/api/admin/activity?limit=100');
+                const data = await response.json();
+
+                const rows = (data.activities || []).map((activity) => `
+                    <tr>
+                        <td>${escapeHtml(new Date(activity.timestamp).toLocaleString())}</td>
+                        <td><span class="badge badge-neutral">${escapeHtml(activity.action || '-')}</span></td>
+                        <td>${escapeHtml(activity.details || '-')}</td>
+                        <td>${escapeHtml(activity.ip_address || '-')}</td>
+                    </tr>
+                `).join('');
+
+                document.getElementById('activityTable').innerHTML = `
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Time</th>
+                                <th>Event</th>
+                                <th>Details</th>
+                                <th>IP Address</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${rows || '<tr><td colspan="4" class="empty-state">No activity recorded yet.</td></tr>'}
+                        </tbody>
+                    </table>
+                `;
+            } catch (error) {
+                console.error('Failed to load activity:', error);
+                document.getElementById('activityTable').innerHTML = '<div class="loading-state">Failed to load activity.</div>';
+            }
+        }
+
+        async function loadDownloads() {
+            try {
+                const response = await fetch('/api/admin/downloads?limit=100');
+                const data = await response.json();
+
+                const rows = (data.downloads || []).map((download) => `
+                    <tr>
+                        <td>${escapeHtml(new Date(download.timestamp).toLocaleString())}</td>
+                        <td>${escapeHtml(download.download_type || '-')}</td>
+                        <td>${escapeHtml(download.item_name || '-')}</td>
+                        <td>${download.success ? '<span class="badge badge-success">Success</span>' : '<span class="badge badge-error">Failed</span>'}</td>
+                        <td>${escapeHtml(download.error_message || '-')}</td>
+                        <td>${escapeHtml(download.ip_address || '-')}</td>
+                    </tr>
+                `).join('');
+
+                document.getElementById('downloadsTable').innerHTML = `
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Time</th>
+                                <th>Type</th>
+                                <th>Item</th>
+                                <th>Status</th>
+                                <th>Error</th>
+                                <th>IP Address</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${rows || '<tr><td colspan="6" class="empty-state">No downloads recorded yet.</td></tr>'}
+                        </tbody>
+                    </table>
+                `;
+            } catch (error) {
+                console.error('Failed to load downloads:', error);
+                document.getElementById('downloadsTable').innerHTML = '<div class="loading-state">Failed to load download history.</div>';
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            document.querySelectorAll('.tab').forEach((tab) => {
+                tab.addEventListener('click', () => switchTab(tab.dataset.tab));
+            });
+
+            loadStats();
+            loadActivity();
+            loadDownloads();
+            setInterval(loadStats, 30000);
+        });
+    </script>
+</body>
+</html>

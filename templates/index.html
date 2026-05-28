@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Playlist Downloader</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <div class="page-shell">
+        <header class="hero surface-card">
+            <div class="hero-copy">
+                <span class="eyebrow">Public Downloader</span>
+                <h1>Download exported song lists and YouTube playlists with less friction.</h1>
+                <p>Import a TXT or CSV playlist, preview what is inside, and export audio or video files from one focused workspace.</p>
+            </div>
+            <div class="hero-actions">
+                <div class="status-chip">No login required</div>
+                <div class="hero-metrics">
+                    <div class="hero-metric">
+                        <span>Sources</span>
+                        <strong>TXT, CSV + YouTube</strong>
+                    </div>
+                    <div class="hero-metric">
+                        <span>Formats</span>
+                        <strong>MP3 or MP4</strong>
+                    </div>
+                    <div class="hero-metric">
+                        <span>Workflow</span>
+                        <strong>Preview, download, track</strong>
+                    </div>
+                </div>
+            </div>
+        </header>
+
+        <div id="globalMessage" class="notice" hidden></div>
+
+        <section class="surface-card settings-card">
+            <div class="section-heading">
+                <span class="eyebrow">Output Settings</span>
+                <h2>Choose where files should go</h2>
+            </div>
+
+            <div class="download-location-toggle">
+                <label class="field-label">Download Location</label>
+                <div class="toggle-buttons">
+                    <button type="button" class="toggle-btn" id="serverToggle" onclick="setDownloadLocation('server')">
+                        Save to Server
+                    </button>
+                    <button type="button" class="toggle-btn active" id="deviceToggle" onclick="setDownloadLocation('device')">
+                        Download to Device
+                    </button>
+                </div>
+                <p class="hint">Device downloads stay enabled by default for safer public use.</p>
+            </div>
+        </section>
+
+        <main class="workspace-grid">
+            <section class="surface-card tool-card spotify-card">
+                <div class="section-heading">
+                    <span class="eyebrow">Import List</span>
+                    <h2>Playlist From File</h2>
+                    <p>Export a TXT or CSV song list, then drop it here to build a downloadable playlist.</p>
+                </div>
+
+                <div class="export-note">
+                    <strong>Need a Spotify list?</strong>
+                    <span>
+                        Export your playlist as TXT or CSV with
+                        <a href="https://www.chosic.com/spotify-playlist-exporter/" target="_blank" rel="noopener noreferrer">Chosic Spotify Playlist Exporter</a>,
+                        then import that file here. No Spotify API key is needed.
+                    </span>
+                </div>
+
+                <div class="format-selector">
+                    <label class="field-label">Format</label>
+                    <div class="format-options">
+                        <label class="format-option">
+                            <input type="radio" name="playlistFormat" value="mp3" checked>
+                            <span>MP3 Audio</span>
+                        </label>
+                        <label class="format-option">
+                            <input type="radio" name="playlistFormat" value="mp4">
+                            <span>MP4 Video</span>
+                        </label>
+                    </div>
+                </div>
+
+                <div class="file-drop-zone" id="playlistDropZone">
+                    <input id="playlistFile" type="file" accept=".txt,.csv,text/plain,text/csv" hidden>
+                    <span class="drop-kicker">TXT or CSV</span>
+                    <strong>Drop your exported playlist here</strong>
+                    <span>or choose a file from your computer</span>
+                    <button id="choosePlaylistFileBtn" type="button" onclick="document.getElementById('playlistFile').click()">Choose File</button>
+                </div>
+                <p class="hint">Accepted formats: one song per line, or CSV with artist/title columns.</p>
+            </section>
+
+            <section class="surface-card tool-card youtube-card">
+                <div class="section-heading">
+                    <span class="eyebrow">YouTube</span>
+                    <h2>Single Video Download</h2>
+                    <p>Download one YouTube video directly as audio or video.</p>
+                </div>
+
+                <div class="format-selector">
+                    <label class="field-label">Format</label>
+                    <div class="format-options">
+                        <label class="format-option">
+                            <input type="radio" name="downloadFormat" value="mp3" checked>
+                            <span>MP3 Audio</span>
+                        </label>
+                        <label class="format-option">
+                            <input type="radio" name="downloadFormat" value="mp4">
+                            <span>MP4 Video</span>
+                        </label>
+                    </div>
+                </div>
+
+                <div class="input-group">
+                    <input
+                        type="text"
+                        id="youtubeUrl"
+                        placeholder="Paste YouTube video URL"
+                        autocomplete="off"
+                    >
+                    <button id="youtubeDownloadBtn" onclick="downloadYouTube()">Download</button>
+                </div>
+                <p class="hint">Example: https://www.youtube.com/watch?v=dQw4w9WgXcQ</p>
+                <div id="youtubeStatus" class="inline-status" hidden></div>
+            </section>
+
+            <section class="surface-card tool-card youtube-playlist-card">
+                <div class="section-heading">
+                    <span class="eyebrow">YouTube</span>
+                    <h2>Playlist Download</h2>
+                    <p>Inspect a full YouTube playlist and download the entire set.</p>
+                </div>
+
+                <div class="format-selector">
+                    <label class="field-label">Format</label>
+                    <div class="format-options">
+                        <label class="format-option">
+                            <input type="radio" name="youtubePlaylistFormat" value="mp3" checked>
+                            <span>MP3 Audio</span>
+                        </label>
+                        <label class="format-option">
+                            <input type="radio" name="youtubePlaylistFormat" value="mp4">
+                            <span>MP4 Video</span>
+                        </label>
+                    </div>
+                </div>
+
+                <div class="input-group">
+                    <input
+                        type="text"
+                        id="youtubePlaylistUrl"
+                        placeholder="Paste YouTube playlist URL"
+                        autocomplete="off"
+                    >
+                    <button id="fetchYoutubePlaylistBtn" onclick="fetchYoutubePlaylist()">Fetch Playlist</button>
+                </div>
+                <p class="hint">Example: https://www.youtube.com/playlist?list=PLx0sYbCqOb8TBPRdmBHs5Iftvv9TPboYG</p>
+            </section>
+        </main>
+
+        <section id="playlistInfo" class="surface-card info-card" hidden>
+            <div class="playlist-header">
+                <img id="playlistImage" class="playlist-thumbnail" src="" alt="Playlist cover" hidden>
+                <div class="playlist-details">
+                    <span class="eyebrow">Imported Playlist</span>
+                    <h2 id="playlistName"></h2>
+                    <p id="playlistDescription"></p>
+                    <p class="track-count" id="trackCount"></p>
+                </div>
+            </div>
+
+            <div class="action-buttons">
+                <button id="downloadBtn" onclick="downloadPlaylist()" class="download-btn">Download All</button>
+                <button id="stopBtn" onclick="stopDownload()" class="stop-btn" hidden>Pause</button>
+                <button id="resumeBtn" onclick="resumeDownload()" class="resume-btn" hidden>Resume</button>
+            </div>
+
+            <div id="trackList" class="track-list"></div>
+        </section>
+
+        <section id="youtubePlaylistInfo" class="surface-card info-card" hidden>
+            <div class="playlist-header">
+                <img id="youtubePlaylistImage" class="playlist-thumbnail" src="" alt="Playlist thumbnail" hidden>
+                <div class="playlist-details">
+                    <span class="eyebrow">YouTube Playlist</span>
+                    <h2 id="youtubePlaylistName"></h2>
+                    <p id="youtubePlaylistDescription"></p>
+                    <p class="track-count" id="youtubeVideoCount"></p>
+                </div>
+            </div>
+
+            <div class="action-buttons">
+                <button id="downloadYoutubePlaylistBtn" onclick="downloadYoutubePlaylist()" class="download-btn">Download All</button>
+                <button id="stopYoutubePlaylistBtn" onclick="stopDownload()" class="stop-btn" hidden>Pause</button>
+                <button id="resumeYoutubePlaylistBtn" onclick="resumeYoutubePlaylist()" class="resume-btn" hidden>Resume</button>
+            </div>
+
+            <div id="youtubeVideoList" class="track-list"></div>
+        </section>
+
+        <section id="progressSection" class="surface-card progress-section" hidden>
+            <div class="section-heading">
+                <span class="eyebrow">Progress</span>
+                <h2>Current Download Session</h2>
+            </div>
+
+            <div class="progress-bar-container">
+                <div id="progressBar" class="progress-bar"></div>
+            </div>
+
+            <p id="progressText" class="progress-text"></p>
+            <p id="currentTrack" class="current-track"></p>
+
+            <div class="results">
+                <div class="results-panel">
+                    <h3>Completed <span id="completedCount">0</span></h3>
+                    <ul id="completedList"></ul>
+                </div>
+
+                <div class="results-panel results-panel-error">
+                    <h3>Failed <span id="failedCount">0</span></h3>
+                    <ul id="failedList"></ul>
+                </div>
+            </div>
+        </section>
+
+        <footer class="page-footer">
+            <p>For personal use only. Respect copyright laws and the terms of the platforms you use.</p>
+        </footer>
+    </div>
+
+    <script src="{{ url_for('static', filename='script.js') }}"></script>
+</body>
+</html>
