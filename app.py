@@ -1,8 +1,5 @@
 import database as db
 from flask import Flask, render_template, request, jsonify, send_from_directory
-import spotipy
-from spotipy.exceptions import SpotifyException
-from spotipy.oauth2 import SpotifyClientCredentials
 import requests
 import hmac
 import os
@@ -20,8 +17,6 @@ app = Flask(__name__)
 app.secret_key = os.getenv('SECRET_KEY', os.urandom(24).hex())
 
 # Configuration
-SPOTIFY_CLIENT_ID = os.getenv('SPOTIFY_CLIENT_ID')
-SPOTIFY_CLIENT_SECRET = os.getenv('SPOTIFY_CLIENT_SECRET')
 DOWNLOAD_FOLDER = os.getenv('DOWNLOAD_FOLDER', 'downloads')
 ALLOW_SERVER_STORAGE = os.getenv('ALLOW_SERVER_STORAGE', 'false').lower() == 'true'
 ADMIN_USERNAME = os.getenv('ADMIN_USERNAME', 'admin')
@@ -43,61 +38,6 @@ download_progress = {
     'playlist_url': '',
     'tracks_info': []
 }
-
-def get_spotify_client():
-    """Initialize Spotify client"""
-    if not SPOTIFY_CLIENT_ID or not SPOTIFY_CLIENT_SECRET:
-        return None
-    
-    try:
-        client_credentials_manager = SpotifyClientCredentials(
-            client_id=SPOTIFY_CLIENT_ID,
-            client_secret=SPOTIFY_CLIENT_SECRET
-        )
-        return spotipy.Spotify(client_credentials_manager=client_credentials_manager)
-    except Exception as e:
-        app.logger.error(f"Failed to initialize Spotify client: {e}")
-        return None
-
-def extract_playlist_id(playlist_url):
-    """Extract playlist ID from Spotify URL"""
-    # Handle different URL formats
-    if 'open.spotify.com/playlist/' in playlist_url:
-        playlist_id = playlist_url.split('playlist/')[1].split('?')[0]
-    elif 'spotify:playlist:' in playlist_url:
-        playlist_id = playlist_url.split('spotify:playlist:')[1]
-    else:
-        playlist_id = playlist_url
-    
-    return playlist_id
-
-
-def spotify_api_error_response(error):
-    """Convert Spotify API failures into user-facing JSON responses."""
-    status_code = getattr(error, 'http_status', None) or 502
-    raw_message = str(error)
-    lower_message = raw_message.lower()
-
-    if status_code == 403 and 'premium subscription' in lower_message:
-        message = (
-            'Spotify blocked this request because the Spotify developer app owner '
-            'does not have an active Premium subscription. Add Premium to the '
-            'Spotify account that owns the app, then wait a few hours for Spotify '
-            'to allow API requests again.'
-        )
-    elif status_code == 403:
-        message = (
-            'Spotify blocked this playlist request. In Development Mode, Spotify '
-            'now restricts some playlist data to apps/users that meet its current '
-            'access rules.'
-        )
-    elif status_code == 404:
-        message = 'Spotify could not find that playlist. Check that the playlist URL is correct and public.'
-    else:
-        message = f'Spotify request failed: {raw_message}'
-
-    app.logger.warning('Spotify API error: %s', raw_message)
-    return jsonify({'error': message}), status_code
 
 def sanitize_filename(filename):
     """Clean filename for safe file system storage"""
@@ -159,67 +99,6 @@ def get_config():
     return jsonify({
         'allow_server_storage': ALLOW_SERVER_STORAGE
     })
-
-@app.route('/api/playlist/info', methods=['POST'])
-def get_playlist_info():
-    """Get playlist metadata"""
-    try:
-        data = request.get_json(silent=True) or {}
-        playlist_url = data.get('playlist_url')
-        
-        if not playlist_url:
-            return jsonify({'error': 'Playlist URL is required'}), 400
-        
-        sp = get_spotify_client()
-        if not sp:
-            return jsonify({
-                'error': 'Spotify API is not configured on this server. Please use the "Import TXT/CSV" feature instead.'
-            }), 501
-
-        playlist_id = extract_playlist_id(playlist_url)
-        
-        # Get playlist details
-        playlist = sp.playlist(playlist_id)
-        
-        tracks_info = []
-        results = sp.playlist_tracks(playlist_id)
-        tracks = results['items']
-        
-        # Handle pagination
-        while results['next']:
-            results = sp.next(results)
-            tracks.extend(results['items'])
-        
-        for item in tracks:
-            if item['track']:
-                track = item['track']
-                tracks_info.append({
-                    'name': track['name'],
-                    'artist': track['artists'][0]['name'] if track['artists'] else 'Unknown',
-                    'album': track['album']['name'] if track['album'] else 'Unknown'
-                })
-
-        db.log_activity(
-            'spotify_playlist_lookup',
-            f"Fetched playlist info: {playlist['name']}",
-            get_request_ip()
-        )
-        
-        return jsonify({
-            'success': True,
-            'playlist': {
-                'name': playlist['name'],
-                'description': playlist['description'],
-                'track_count': len(tracks_info),
-                'image': playlist['images'][0]['url'] if playlist['images'] else None,
-                'tracks': tracks_info
-            }
-        })
-    except SpotifyException as e:
-        return spotify_api_error_response(e)
-    
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
 
 def search_youtube_video(song_name, artist):
     """Find best matching YouTube video"""
@@ -439,10 +318,6 @@ def download_playlist():
                 'completed': len(download_progress['completed']),
                 'failed': len(download_progress['failed'])
             })
-
-    except SpotifyException as e:
-        download_progress['status'] = 'error'
-        return spotify_api_error_response(e)
 
     except Exception as e:
         download_progress['status'] = 'error'
